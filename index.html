@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="theme-color" content="#e8e6df">
+  <title>RetroChat</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="theme-mac">
+
+  <div id="app" class="app">
+
+    <!-- Top bar -->
+    <header class="topbar">
+      <button id="btn-menu" class="iconbtn" type="button" data-i18n-aria="topbar.menu">&#9776;</button>
+      <div class="brand">RetroChat<span class="cursor">&#9608;</span></div>
+      <button id="btn-new" class="iconbtn" type="button" data-i18n-aria="topbar.new">&#43;</button>
+      <button id="btn-settings" class="iconbtn" type="button" data-i18n-aria="topbar.settings">&#9881;</button>
+    </header>
+
+    <div class="body">
+
+      <!-- Sidebar / conversation list -->
+      <aside id="sidebar" class="sidebar">
+        <div class="sidebar-head" data-i18n="sidebar.heading">CONVERSATIONS</div>
+        <ul id="conv-list" class="conv-list"></ul>
+        <div class="sidebar-foot">
+          <button id="btn-clear-all" class="linkbtn" type="button" data-i18n="sidebar.clear_all">[ clear all ]</button>
+        </div>
+      </aside>
+
+      <!-- Backdrop for mobile sidebar -->
+      <div id="backdrop" class="backdrop"></div>
+
+      <!-- Main chat area -->
+      <main class="main">
+        <div id="messages" class="messages">
+          <div class="empty">
+            <div class="empty-title" data-i18n="empty.title">&gt; RetroChat ready.</div>
+            <div class="empty-hint" data-i18n="empty.hint1">type a message and press send.</div>
+            <div class="empty-hint" data-i18n="empty.hint2">switch model? press &#9881; in the top bar.</div>
+          </div>
+        </div>
+        <form id="composer" class="composer">
+          <textarea id="input" class="input" rows="2" data-i18n-placeholder="composer.placeholder" placeholder="Type a message..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+          <button id="btn-send" class="sendbtn" type="submit" data-i18n="composer.send">SEND</button>
+        </form>
+      </main>
+
+    </div>
+
+  </div>
+
+  <!-- Welcome modal (first run only) -->
+  <div id="welcome-modal" class="modal welcome">
+    <div class="modal-card welcome-card">
+      <div class="welcome-head">
+        <div class="welcome-logo">RetroChat<span class="cursor">&#9608;</span></div>
+        <div class="welcome-tagline" data-i18n="welcome.tagline">An AI chat client that runs on iPhone 5s</div>
+      </div>
+      <div class="welcome-body">
+        <div class="welcome-feature">
+          <div class="wf-icon">&#9619;</div>
+          <div class="wf-text">
+            <div class="wf-title" data-i18n="welcome.f1.t">Retro-compatible</div>
+            <div class="wf-desc"  data-i18n="welcome.f1.d">ES5 + Flexbox + XHR streaming — smooth on iOS 12 Safari</div>
+          </div>
+        </div>
+        <div class="welcome-feature">
+          <div class="wf-icon">&#9658;</div>
+          <div class="wf-text">
+            <div class="wf-title" data-i18n="welcome.f2.t">Ready out of the box</div>
+            <div class="wf-desc"  data-i18n="welcome.f2.d">mimo-v2.5-pro pre-configured. Just start typing.</div>
+          </div>
+        </div>
+        <div class="welcome-feature">
+          <div class="wf-icon">&#9881;</div>
+          <div class="wf-text">
+            <div class="wf-title" data-i18n="welcome.f3.t">Fully customisable</div>
+            <div class="wf-desc"  data-i18n="welcome.f3.d">Swap to any OpenAI-compatible model, theme &amp; language</div>
+          </div>
+        </div>
+        <div class="welcome-feature">
+          <div class="wf-icon">&#9733;</div>
+          <div class="wf-text">
+            <div class="wf-title" data-i18n="welcome.f4.t">Privacy first</div>
+            <div class="wf-desc"  data-i18n="welcome.f4.d">Chats live in your browser localStorage. Export anytime.</div>
+          </div>
+        </div>
+      </div>
+      <div class="welcome-foot">
+        <button id="btn-welcome-skip"  class="ghostbtn"   type="button" data-i18n="welcome.skip">Skip</button>
+        <button id="btn-welcome-start" class="primarybtn" type="button" data-i18n="welcome.start">Start chatting →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings modal -->
+  <div id="settings-modal" class="modal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <span data-i18n="settings.title">SETTINGS</span>
+        <button id="btn-close-settings" class="iconbtn" type="button" data-i18n-aria="settings.close">&#10005;</button>
+      </div>
+      <div class="modal-body">
+
+        <label class="row">
+          <span class="row-label" data-i18n="settings.preset">Preset</span>
+          <select id="cfg-preset" class="row-input">
+            <option value=""         data-i18n="settings.preset_pick">-- choose a preset --</option>
+            <option value="mimo">Xiaomi MiMo v2.5 Pro</option>
+            <option value="deepseek">DeepSeek</option>
+            <option value="custom"   data-i18n="settings.preset_custom">Custom</option>
+          </select>
+        </label>
+
+        <label class="row">
+          <span class="row-label" data-i18n="settings.baseurl">Base URL</span>
+          <input id="cfg-baseurl" class="row-input" type="text" placeholder="(use server default)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        </label>
+        <div class="row-hint" data-i18n="settings.baseurl_hint">OpenAI-compatible endpoint root.</div>
+
+        <label class="row">
+          <span class="row-label" data-i18n="settings.apikey">API Key</span>
+          <input id="cfg-apikey" class="row-input" type="password" placeholder="(use server default)" autocomplete="off">
+        </label>
+
+        <label class="row">
+          <span class="row-label" data-i18n="settings.model">Model</span>
+          <input id="cfg-model" class="row-input" type="text" placeholder="mimo-v2.5-pro" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        </label>
+
+        <label class="row">
+          <span class="row-label" data-i18n="settings.temperature">Temperature</span>
+          <input id="cfg-temperature" class="row-input" type="range" min="0" max="2" step="0.1" value="0.7">
+          <span id="cfg-temperature-val" class="row-suffix">0.7</span>
+        </label>
+
+        <label class="row">
+          <span class="row-label" data-i18n="settings.auto_title">Auto title</span>
+          <span class="row-checkbox-wrap">
+            <input id="cfg-auto-title" class="row-checkbox" type="checkbox">
+          </span>
+        </label>
+        <div class="row-hint" data-i18n="settings.auto_title_hint">After the first reply, ask the AI to summarise the topic into a short title.</div>
+
+        <label class="row">
+          <span class="row-label" data-i18n="settings.theme">Theme</span>
+          <select id="cfg-theme" class="row-input">
+            <option value="mac"   data-i18n="settings.theme.mac">Old Mac gray</option>
+            <option value="paper" data-i18n="settings.theme.paper">Paper / sepia</option>
+            <option value="amber" data-i18n="settings.theme.amber">Amber terminal</option>
+            <option value="crt"   data-i18n="settings.theme.crt">CRT green</option>
+          </select>
+        </label>
+
+        <label class="row">
+          <span class="row-label" data-i18n="settings.language">Language</span>
+          <select id="cfg-lang" class="row-input">
+            <option value="auto" data-i18n="settings.lang.auto">Auto (system)</option>
+            <option value="zh"   data-i18n="settings.lang.zh">简体中文</option>
+            <option value="en"   data-i18n="settings.lang.en">English</option>
+          </select>
+        </label>
+
+        <div class="modal-actions">
+          <button id="btn-export" class="ghostbtn" type="button" data-i18n="settings.export">Export JSON</button>
+          <button id="btn-import" class="ghostbtn" type="button" data-i18n="settings.import">Import JSON</button>
+          <input id="import-file" type="file" accept="application/json" style="display:none">
+        </div>
+
+      </div>
+      <div class="modal-foot">
+        <button id="btn-save-settings" class="primarybtn" type="button" data-i18n="settings.save">SAVE</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Vendor libs -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.4/jquery.slim.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
+
+  <!-- App scripts (load order matters) -->
+  <script src="/js/i18n.js"></script>
+  <script src="/js/storage.js"></script>
+  <script src="/js/stream.js"></script>
+  <script src="/js/chat.js"></script>
+  <script src="/js/settings.js"></script>
+  <script src="/js/app.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,105 @@
+// app.js — entry point. Wires up DOM events and bootstraps modules.
+
+(function (global, $) {
+  'use strict';
+
+  function isMobile() {
+    return window.matchMedia && window.matchMedia('(max-width: 640px)').matches;
+  }
+
+  function openSidebar()  { $('#sidebar, #backdrop').addClass('open'); }
+  function closeSidebar() { $('#sidebar, #backdrop').removeClass('open'); }
+
+  function showWelcome() {
+    $('#welcome-modal').addClass('open');
+  }
+
+  function hideWelcome() {
+    $('#welcome-modal').removeClass('open');
+    RetroStorage.markWelcomed();
+  }
+
+  function bind() {
+    // Composer submit (Enter to send, Shift+Enter for newline).
+    $('#composer').on('submit', function (e) {
+      e.preventDefault();
+      if (RetroChat.isStreaming()) {
+        RetroChat.abort();
+        return;
+      }
+      var $input = $('#input');
+      var text = $input.val();
+      if (!text || !text.trim()) return;
+      RetroChat.send(text);
+      $input.val('');
+    });
+
+    $('#input').on('keydown', function (e) {
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+        e.preventDefault();
+        $('#composer').trigger('submit');
+      }
+    });
+
+    // Conversation list — delegate clicks for items + delete buttons.
+    $('#conv-list').on('click', '.conv-item .del', function (e) {
+      e.stopPropagation();
+      var id = $(this).attr('data-id');
+      if (id && confirm(RetroI18n.t('confirm.delete_conv'))) {
+        RetroChat.deleteConversation(id);
+      }
+    });
+    $('#conv-list').on('click', '.conv-item', function () {
+      var id = $(this).attr('data-id');
+      if (!id) return;
+      RetroChat.loadConversation(id);
+      if (isMobile()) closeSidebar();
+    });
+
+    $('#btn-new').on('click', function () {
+      RetroChat.newConversation();
+      if (isMobile()) closeSidebar();
+    });
+    $('#btn-clear-all').on('click', function () {
+      if (confirm(RetroI18n.t('confirm.clear_all'))) {
+        RetroChat.clearAll();
+      }
+    });
+
+    // Mobile sidebar toggling.
+    $('#btn-menu').on('click', function () {
+      if ($('#sidebar').hasClass('open')) closeSidebar();
+      else openSidebar();
+    });
+    $('#backdrop').on('click', closeSidebar);
+
+    // Welcome modal buttons.
+    $('#btn-welcome-start').on('click', hideWelcome);
+    $('#btn-welcome-skip').on('click', hideWelcome);
+
+    // Wire up the settings modal.
+    RetroSettings.bind();
+  }
+
+  $(function () {
+    var cfg = RetroStorage.getConfig();
+
+    // 1) Apply language FIRST so all subsequent renders pick up the strings.
+    RetroSettings.applyLang(cfg.lang);
+
+    // 2) Apply theme.
+    RetroSettings.applyTheme(cfg.theme);
+
+    // 3) Wire up handlers.
+    bind();
+
+    // 4) Bootstrap chat (creates / loads conversations).
+    RetroChat.init();
+
+    // 5) First-run welcome (shown only once per device).
+    if (!RetroStorage.isWelcomed()) {
+      showWelcome();
+    }
+  });
+
+})(window, window.jQuery);
