@@ -33,6 +33,7 @@
     el('cfg-model').value = cfg.model || 'mimo-v2.5-pro';
     el('cfg-temperature').value = cfg.temperature != null ? cfg.temperature : 0.7;
     el('cfg-temperature-val').textContent = (cfg.temperature != null ? cfg.temperature : 0.7);
+    el('cfg-system-prompt').value = cfg.systemPrompt || '';
     el('cfg-theme').value = cfg.theme || 'mac';
     el('cfg-lang').value = cfg.lang || 'auto';
     el('cfg-auto-title').checked = cfg.autoTitle !== false;
@@ -44,6 +45,7 @@
       apiKey: (el('cfg-apikey').value || '').trim(),
       model: (el('cfg-model').value || '').trim(),
       temperature: parseFloat(el('cfg-temperature').value),
+      systemPrompt: el('cfg-system-prompt').value || '',
       theme: el('cfg-theme').value,
       lang: el('cfg-lang').value,
       autoTitle: !!el('cfg-auto-title').checked

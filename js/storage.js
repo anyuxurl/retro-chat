@@ -14,6 +14,7 @@
     apiKey: '',      // empty → backend uses MIMO_API_KEY env var
     model: 'mimo-v2.5-pro',
     temperature: 0.7,
+    systemPrompt: '',
     theme: 'mac',
     lang: 'auto',
     autoTitle: true

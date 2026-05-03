@@ -87,8 +87,69 @@
     }
     var $content = $('<div class="content"></div>').html(renderMarkdown(msg.content || ''));
     $bub.append($content);
+    // Copy button on assistant messages only — user messages are typed
+    // by the user, errors are rendered with a different style.
+    if (msg.role === 'assistant') {
+      $bub.append(
+        $('<div class="msg-actions"></div>').append(
+          $('<button class="msg-copy" type="button"></button>').text(RetroI18n.t('msg.copy'))
+        )
+      );
+    }
     $row.append($bub);
     return $row;
+  }
+
+  // Clipboard with iOS 12 fallback. navigator.clipboard.writeText needs
+  // iOS 13.4+ AND a secure context, so on the device we explicitly target
+  // we cannot rely on it. The execCommand path works on iOS 10+.
+  function copyText(text) {
+    if (global.navigator && global.navigator.clipboard &&
+        typeof global.navigator.clipboard.writeText === 'function' &&
+        global.isSecureContext) {
+      return global.navigator.clipboard.writeText(text)
+        .then(function () { return true; })
+        .catch(function () { return execCommandCopy(text); });
+    }
+    return Promise.resolve(execCommandCopy(text));
+  }
+
+  function execCommandCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.top = '0';
+    ta.style.left = '-9999px';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { ta.setSelectionRange(0, text.length); } catch (e) {}
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    return ok;
+  }
+
+  // Locate the assistant content text for a copy click. We use the message
+  // index in state.messages — derived from DOM position — because the
+  // rendered HTML may include a reasoning block we don't want copied.
+  function copyMessageFromButton(btn) {
+    var $btn = $(btn);
+    var $row = $btn.closest('.msg');
+    if (!$row.length) return;
+    // The rendered DOM order matches state.messages 1:1.
+    var idx = $('#messages > .msg').index($row);
+    if (idx < 0 || idx >= state.messages.length) return;
+    var m = state.messages[idx];
+    if (m.role !== 'assistant' || !m.content) return;
+    copyText(m.content).then(function (ok) {
+      if (!ok) return;
+      $btn.text(RetroI18n.t('msg.copied')).addClass('copied');
+      setTimeout(function () {
+        $btn.text(RetroI18n.t('msg.copy')).removeClass('copied');
+      }, 1200);
+    });
   }
 
   function renderAll() {
@@ -116,29 +177,67 @@
     return $row;
   }
 
-  function scrollToBottom() {
+  // Auto-scroll behaviour: only stick to the bottom when the user is
+  // already there. If they've scrolled up to read history, leave them be.
+  // We reset on conversation switch / new conversation so a fresh thread
+  // always glues to the bottom for the first round.
+  var userScrolledUp = false;
+  var SCROLL_GLUE_PX = 80;
+
+  function bindScrollWatcher() {
     var el = document.getElementById('messages');
-    if (el) el.scrollTop = el.scrollHeight;
+    if (!el || el._retroScrollBound) return;
+    el._retroScrollBound = true;
+    el.addEventListener('scroll', function () {
+      var distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+      userScrolledUp = distance > SCROLL_GLUE_PX;
+    }, { passive: true });
+  }
+
+  function scrollToBottom(force) {
+    var el = document.getElementById('messages');
+    if (!el) return;
+    if (!force && userScrolledUp) return;
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function resetScrollGlue() {
+    userScrolledUp = false;
   }
 
   function persist() {
     if (!state.currentId) return;
+    // Drop a trailing assistant placeholder that has no content yet — it
+    // exists only to host the streaming UI bubble. If the user refreshes
+    // mid-stream we don't want to load a ghost message from localStorage.
+    var msgs = state.messages.slice();
+    while (msgs.length) {
+      var last = msgs[msgs.length - 1];
+      if (last.role === 'assistant' && !last.content && !last.reasoning) {
+        msgs.pop();
+      } else {
+        break;
+      }
+    }
     var conv = RetroStorage.getConversation(state.currentId);
     if (!conv) {
+      // No content yet means no conversation worth saving — wait for the
+      // first delta to arrive before creating the localStorage entry.
+      if (!msgs.length) return;
       conv = {
         id: state.currentId,
-        title: deriveTitle(state.messages),
+        title: deriveTitle(msgs),
         createdAt: Date.now(),
         updatedAt: Date.now(),
-        messages: state.messages.slice()
+        messages: msgs
       };
     } else {
       // Preserve an AI-generated title — only refresh the fallback title
       // (truncated first user message) when the AI hasn't named it yet.
       if (!conv.titleAiGenerated) {
-        conv.title = deriveTitle(state.messages);
+        conv.title = deriveTitle(msgs);
       }
-      conv.messages = state.messages.slice();
+      conv.messages = msgs;
     }
     RetroStorage.saveConversation(conv);
     refreshSidebar();
@@ -179,6 +278,7 @@
     state.currentId = id;
     state.messages = (conv.messages || []).slice();
     RetroStorage.setCurrentId(id);
+    resetScrollGlue();
     renderAll();
     refreshSidebar();
   }
@@ -187,6 +287,7 @@
     state.currentId = RetroStorage.newConversationId();
     state.messages = [];
     RetroStorage.setCurrentId(state.currentId);
+    resetScrollGlue();
     renderAll();
     refreshSidebar();
   }
@@ -225,6 +326,10 @@
     if (state.streaming) return;
     if (!text || !text.trim()) return;
 
+    // User just hit send — they want to see the result. Reset glue so we
+    // auto-scroll even if they had been browsing history.
+    resetScrollGlue();
+
     var userMsg = { role: 'user', content: text, ts: Date.now() };
     state.messages.push(userMsg);
     appendMessage(userMsg);
@@ -241,12 +346,17 @@
     persist();
     setStreamingUI(true);
 
+    var apiMessages = buildApiMessages(state.messages);
+    if (cfg.systemPrompt && typeof cfg.systemPrompt === 'string' && cfg.systemPrompt.trim()) {
+      apiMessages.unshift({ role: 'system', content: cfg.systemPrompt.trim() });
+    }
+
     var payload = {
       baseUrl: cfg.baseUrl,
       apiKey: cfg.apiKey,
       model: cfg.model,
       temperature: Number(cfg.temperature) || 0.7,
-      messages: buildApiMessages(state.messages)
+      messages: apiMessages
     };
 
     var stream = RetroStream.streamChat(payload, {
@@ -260,6 +370,7 @@
             $reasoning.append($reasoningContent);
             $bubble.find('.role').after($reasoning);
           }
+          // .text() is a cheap textNode replace — no throttle needed.
           $reasoningContent.text(aiMsg.reasoning);
         } else {
           aiMsg.content += delta;
@@ -269,11 +380,17 @@
             $reasoning.find('summary').text(RetroI18n.t('msg.thinking_done'));
             collapsedOnContent = true;
           }
-          $content.html(renderMarkdown(aiMsg.content));
+          // Throttle markdown re-rendering to ~80ms. Each marked.parse()
+          // re-tokenises the entire response so far; on iPhone 5s a long
+          // answer with 200+ deltas would otherwise stutter visibly.
+          renderContentThrottled();
         }
         scrollToBottom();
       },
       onDone: function () {
+        // Force a final flush so the user sees the complete, fully-parsed
+        // markdown (the throttled version may still be 80ms behind).
+        renderContentNow();
         setStreamingUI(false);
         state.activeStream = null;
         persist();
@@ -281,6 +398,7 @@
         maybeAutoTitle(state.currentId);
       },
       onError: function (msg) {
+        renderContentNow();
         setStreamingUI(false);
         state.activeStream = null;
         var errText = '\n\n' + RetroI18n.t('msg.error_prefix') + msg;
@@ -294,13 +412,40 @@
           $err.addClass('error');
         } else {
           aiMsg.content += errText;
-          $content.html(renderMarkdown(aiMsg.content));
+          renderContentNow();
         }
         scrollToBottom();
         persist();
       }
     });
     state.activeStream = stream;
+
+    // Per-stream render throttler. Captured in this closure so multiple
+    // simultaneous turns wouldn't share state (we don't allow that today,
+    // but keeping it scoped means refactors later won't introduce bugs).
+    var lastRenderAt = 0;
+    var pendingRenderTimer = null;
+    function renderContentNow() {
+      if (pendingRenderTimer) {
+        clearTimeout(pendingRenderTimer);
+        pendingRenderTimer = null;
+      }
+      $content.html(renderMarkdown(aiMsg.content));
+      lastRenderAt = Date.now();
+    }
+    function renderContentThrottled() {
+      var now = Date.now();
+      if (now - lastRenderAt >= 80) {
+        renderContentNow();
+        return;
+      }
+      if (pendingRenderTimer) return;
+      pendingRenderTimer = setTimeout(function () {
+        pendingRenderTimer = null;
+        $content.html(renderMarkdown(aiMsg.content));
+        lastRenderAt = Date.now();
+      }, 80);
+    }
   }
 
   function buildApiMessages(msgs) {
@@ -447,6 +592,11 @@
   }
 
   function init() {
+    bindScrollWatcher();
+    // Delegated click for per-message copy buttons.
+    $('#messages').on('click', '.msg-copy', function () {
+      copyMessageFromButton(this);
+    });
     var lastId = RetroStorage.getCurrentId();
     var convs = RetroStorage.listConversations();
     if (lastId && RetroStorage.getConversation(lastId)) {
