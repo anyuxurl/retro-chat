@@ -3,6 +3,44 @@
 (function (global, $) {
   'use strict';
 
+  // Harden marked's link rendering once at startup. Two goals:
+  //   1) Block dangerous URL schemes (javascript:, vbscript:, data:, file:)
+  //      that would otherwise render as clickable links in AI responses.
+  //   2) Force every external link to open in a new tab without leaking
+  //      the referrer / opener handle back to the destination.
+  if (global.marked && typeof global.marked.use === 'function') {
+    global.marked.use({
+      renderer: {
+        link: function (href, title, text) {
+          if (!isSafeHref(href)) return text;        // strip the link entirely
+          var attrs = ' href="' + escapeAttr(href) + '"';
+          if (title) attrs += ' title="' + escapeAttr(title) + '"';
+          attrs += ' target="_blank" rel="noopener noreferrer"';
+          return '<a' + attrs + '>' + text + '</a>';
+        }
+      }
+    });
+  }
+
+  function isSafeHref(href) {
+    if (typeof href !== 'string') return false;
+    var s = href.trim();
+    if (!s) return false;
+    // Allow relative, root-relative, and fragment refs.
+    if (s.charAt(0) === '/' || s.charAt(0) === '#' || s.charAt(0) === '?') return true;
+    if (/^\.\.?\//.test(s)) return true;
+    // Otherwise require an explicit safe scheme.
+    return /^(https?|mailto|tel):/i.test(s);
+  }
+
+  function escapeAttr(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
   var state = {
     currentId: '',
     messages: [],     // [{role, content, ts}]
