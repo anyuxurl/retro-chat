@@ -11,7 +11,7 @@
       'topbar.settings':     '设置',
       'sidebar.heading':     '对话历史',
       'sidebar.clear_all':   '[ 清空全部 ]',
-      'composer.placeholder':'输入消息…  (Enter 发送 / Shift+Enter 换行)',
+      'composer.placeholder':'输入消息…  (Shift+Enter 换行)',
       'composer.send':       '发送',
       'composer.stop':       '停止',
       'empty.title':         '> RetroChat 就绪。',
@@ -67,7 +67,7 @@
       'welcome.f4.t':        '隐私至上',
       'welcome.f4.d':        '会话只存在你的浏览器 localStorage，可一键导入导出',
       'welcome.start':       '开始聊天 →',
-      'welcome.skip':        '跳过'
+      'welcome.skip':        '稍后再看'
     },
 
     'en': {
@@ -76,7 +76,7 @@
       'topbar.settings':     'Settings',
       'sidebar.heading':     'CONVERSATIONS',
       'sidebar.clear_all':   '[ clear all ]',
-      'composer.placeholder':'Type a message…  (Enter to send / Shift+Enter for newline)',
+      'composer.placeholder':'Type a message…  (Shift+Enter for newline)',
       'composer.send':       'SEND',
       'composer.stop':       'STOP',
       'empty.title':         '> RetroChat ready.',
@@ -132,7 +132,7 @@
       'welcome.f4.t':        'Privacy first',
       'welcome.f4.d':        'Chats live in your browser localStorage. Export anytime.',
       'welcome.start':       'Start chatting →',
-      'welcome.skip':        'Skip'
+      'welcome.skip':        'Maybe later'
     }
   };
 

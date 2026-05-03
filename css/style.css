@@ -430,7 +430,15 @@ body {
 .modal-foot {
   padding: 10px 12px;
   border-top: 1px dashed currentColor;
-  text-align: right;
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: flex;
+  -webkit-box-align: center;
+  -webkit-align-items: center;
+  align-items: center;
+  -webkit-box-pack: justify;
+  -webkit-justify-content: space-between;
+  justify-content: space-between;
 }
 
 .row {
@@ -687,6 +695,34 @@ body {
   -webkit-box-align: center;
   -webkit-align-items: center;
   align-items: center;
+}
+
+/* Author / source line shown in welcome and settings modals. */
+.welcome-about,
+.about-inline {
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  opacity: 0.55;
+}
+.welcome-about {
+  text-align: center;
+  padding: 8px 16px 0;
+}
+.welcome-about a,
+.about-inline a {
+  color: inherit;
+  text-decoration: underline;
+}
+.welcome-about a:hover,
+.about-inline a:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+.about-inline {
+  -webkit-box-flex: 1;
+  -webkit-flex: 1;
+  flex: 1;
+  text-align: left;
 }
 .welcome-foot .ghostbtn {
   -webkit-box-flex: 0;

@@ -14,9 +14,21 @@
     $('#welcome-modal').addClass('open');
   }
 
-  function hideWelcome() {
+  // "Start chatting" — close, mark as welcomed (won't show again),
+  // and focus the composer so the user can type immediately.
+  function startFromWelcome() {
     $('#welcome-modal').removeClass('open');
     RetroStorage.markWelcomed();
+    var input = document.getElementById('input');
+    if (input && typeof input.focus === 'function') {
+      try { input.focus(); } catch (e) {}
+    }
+  }
+
+  // "Maybe later" — close the modal but DON'T mark as welcomed, so the user
+  // can come back to the intro on the next visit.
+  function skipWelcome() {
+    $('#welcome-modal').removeClass('open');
   }
 
   function bind() {
@@ -74,8 +86,8 @@
     $('#backdrop').on('click', closeSidebar);
 
     // Welcome modal buttons.
-    $('#btn-welcome-start').on('click', hideWelcome);
-    $('#btn-welcome-skip').on('click', hideWelcome);
+    $('#btn-welcome-start').on('click', startFromWelcome);
+    $('#btn-welcome-skip').on('click', skipWelcome);
 
     // Wire up the settings modal.
     RetroSettings.bind();
