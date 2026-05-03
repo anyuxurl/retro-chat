@@ -87,13 +87,16 @@
     }
     var $content = $('<div class="content"></div>').html(renderMarkdown(msg.content || ''));
     $bub.append($content);
-    // Copy button on assistant messages only — user messages are typed
-    // by the user, errors are rendered with a different style.
     if (msg.role === 'assistant') {
       $bub.append(
-        $('<div class="msg-actions"></div>').append(
-          $('<button class="msg-copy" type="button"></button>').text(RetroI18n.t('msg.copy'))
-        )
+        $('<div class="msg-actions"></div>')
+          .append($('<button class="msg-btn msg-regen" type="button"></button>').text(RetroI18n.t('msg.regen')))
+          .append($('<button class="msg-btn msg-copy"  type="button"></button>').text(RetroI18n.t('msg.copy')))
+      );
+    } else if (msg.role === 'user') {
+      $bub.append(
+        $('<div class="msg-actions"></div>')
+          .append($('<button class="msg-btn msg-edit" type="button"></button>').text(RetroI18n.t('msg.edit')))
       );
     }
     $row.append($bub);
@@ -152,6 +155,63 @@
     });
   }
 
+  function regenFromButton(btn) {
+    if (state.streaming) return;
+    var idx = $('#messages > .msg').index($(btn).closest('.msg'));
+    regenerate(idx);
+  }
+
+  // Replace the user-message bubble with an inline editor. Save resubmits
+  // the conversation up to and including the edited prompt; cancel just
+  // re-renders the original bubble.
+  function startEditFromButton(btn) {
+    if (state.streaming) return;
+    var $row = $(btn).closest('.msg');
+    var idx = $('#messages > .msg').index($row);
+    if (idx < 0 || idx >= state.messages.length) return;
+    var m = state.messages[idx];
+    if (m.role !== 'user') return;
+
+    var original = m.content || '';
+    var $editor = $('<div class="msg-editor"></div>');
+    var $ta = $('<textarea class="msg-editor-input" rows="3"></textarea>').val(original);
+    var $actions = $('<div class="msg-actions"></div>');
+    var $save = $('<button class="msg-btn msg-edit-save"   type="button"></button>').text(RetroI18n.t('msg.edit_save'));
+    var $cancel = $('<button class="msg-btn msg-edit-cancel" type="button"></button>').text(RetroI18n.t('msg.edit_cancel'));
+    $actions.append($cancel).append($save);
+    $editor.append($ta).append($actions);
+
+    var $bubble = $row.find('.bubble');
+    $bubble.empty();
+    $bubble.append($('<span class="role"></span>').text(roleLabel('user')));
+    $bubble.append($editor);
+
+    // Auto-focus and place cursor at the end.
+    setTimeout(function () {
+      var el = $ta[0];
+      try { el.focus(); el.setSelectionRange(original.length, original.length); } catch (e) {}
+    }, 0);
+
+    $cancel.on('click', function () {
+      // Re-render this single bubble in place.
+      var fresh = buildBubble(state.messages[idx]);
+      $row.replaceWith(fresh);
+    });
+    $save.on('click', function () {
+      var newText = $ta.val();
+      if (!newText || !newText.trim()) return;
+      editAndResend(idx, newText);
+    });
+    $ta.on('keydown', function (e) {
+      // Enter without shift saves (consistent with the composer); guard
+      // against IME composition just like the composer does.
+      if (e.key !== 'Enter' || e.shiftKey) return;
+      if (e.isComposing === true || e.keyCode === 229 || e.which === 229) return;
+      e.preventDefault();
+      $save.trigger('click');
+    });
+  }
+
   function renderAll() {
     var $msgs = $('#messages');
     $msgs.empty();
@@ -191,7 +251,22 @@
     el.addEventListener('scroll', function () {
       var distance = el.scrollHeight - el.scrollTop - el.clientHeight;
       userScrolledUp = distance > SCROLL_GLUE_PX;
+      updateScrollButton();
     }, { passive: true });
+    // The floating ↓ button — clicking it always scrolls and re-glues.
+    var $btn = $('#btn-scroll-bottom');
+    $btn.on('click', function () {
+      userScrolledUp = false;
+      scrollToBottom(true);
+      updateScrollButton();
+    });
+  }
+
+  function updateScrollButton() {
+    var $btn = $('#btn-scroll-bottom');
+    if (!$btn.length) return;
+    if (userScrolledUp) $btn.addClass('visible');
+    else                $btn.removeClass('visible');
   }
 
   function scrollToBottom(force) {
@@ -203,6 +278,7 @@
 
   function resetScrollGlue() {
     userScrolledUp = false;
+    updateScrollButton();
   }
 
   function persist() {
@@ -257,8 +333,10 @@
     var $list = $('#conv-list');
     $list.empty();
     var convs = RetroStorage.listConversations();
+    var q = (($('#conv-search').val() || '') + '').toLowerCase().trim();
     for (var i = 0; i < convs.length; i++) {
       var c = convs[i];
+      if (q && !matchesConvQuery(c, q)) continue;
       var $li = $('<li class="conv-item"></li>')
         .attr('data-id', c.id)
         .text(c.title || RetroI18n.t('conv.untitled'));
@@ -266,6 +344,19 @@
       $li.append($('<span class="del" data-id="' + c.id + '">&times;</span>'));
       $list.append($li);
     }
+  }
+
+  // Search match: title first (cheap), then scan message content. Case-
+  // insensitive substring matching is plenty for a single-user app.
+  function matchesConvQuery(conv, q) {
+    if (!q) return true;
+    if ((conv.title || '').toLowerCase().indexOf(q) >= 0) return true;
+    var msgs = conv.messages || [];
+    for (var i = 0; i < msgs.length; i++) {
+      var c = msgs[i] && msgs[i].content;
+      if (c && String(c).toLowerCase().indexOf(q) >= 0) return true;
+    }
+    return false;
   }
 
   function loadConversation(id) {
@@ -316,30 +407,67 @@
   }
 
   function send(text) {
+    if (state.streaming) return;
+    if (!text || !text.trim()) return;
     var cfg = RetroStorage.getConfig();
-    // baseUrl/apiKey may be blank — the backend falls back to server env vars.
-    // Only pop settings if model is missing (rare).
     if (!cfg.model) {
       RetroSettings.open(true);
       return;
     }
-    if (state.streaming) return;
-    if (!text || !text.trim()) return;
-
     // User just hit send — they want to see the result. Reset glue so we
     // auto-scroll even if they had been browsing history.
     resetScrollGlue();
-
     var userMsg = { role: 'user', content: text, ts: Date.now() };
     state.messages.push(userMsg);
     appendMessage(userMsg);
+    runTurn();
+  }
+
+  // Regenerate the assistant reply at `assistantIdx`. Drops that message
+  // and everything after, then re-runs the turn with the same history.
+  function regenerate(assistantIdx) {
+    if (state.streaming) return;
+    if (assistantIdx == null || assistantIdx < 0 || assistantIdx >= state.messages.length) return;
+    if (state.messages[assistantIdx].role !== 'assistant') return;
+    state.messages = state.messages.slice(0, assistantIdx);
+    if (!state.messages.length) return;
+    var last = state.messages[state.messages.length - 1];
+    if (last.role !== 'user') return;
+    resetScrollGlue();
+    renderAll();
+    persist();
+    runTurn();
+  }
+
+  // Replace the user message at `userIdx` with `newText`, drop everything
+  // after, then re-run the turn so the AI answers the edited prompt.
+  function editAndResend(userIdx, newText) {
+    if (state.streaming) return;
+    if (userIdx == null || userIdx < 0 || userIdx >= state.messages.length) return;
+    if (state.messages[userIdx].role !== 'user') return;
+    if (!newText || !newText.trim()) return;
+    state.messages = state.messages.slice(0, userIdx + 1);
+    state.messages[userIdx].content = newText.trim();
+    state.messages[userIdx].ts = Date.now();
+    resetScrollGlue();
+    renderAll();
+    persist();
+    runTurn();
+  }
+
+  // Shared turn runner used by send / regenerate / editAndResend. Assumes
+  // state.messages already ends with a user message; pushes an assistant
+  // placeholder, opens a stream, and wires up the delta/done/error handlers.
+  function runTurn() {
+    var cfg = RetroStorage.getConfig();
+    if (!cfg.model) { RetroSettings.open(true); return; }
 
     var aiMsg = { role: 'assistant', content: '', reasoning: '', ts: Date.now() };
     state.messages.push(aiMsg);
     var $row = appendMessage(aiMsg);
     var $content = $row.find('.content');
     var $bubble = $row.find('.bubble');
-    var $reasoning = null;          // lazy-created when first reasoning chunk arrives
+    var $reasoning = null;
     var $reasoningContent = null;
     var collapsedOnContent = false;
 
@@ -593,10 +721,10 @@
 
   function init() {
     bindScrollWatcher();
-    // Delegated click for per-message copy buttons.
-    $('#messages').on('click', '.msg-copy', function () {
-      copyMessageFromButton(this);
-    });
+    // Delegated clicks for per-message buttons.
+    $('#messages').on('click', '.msg-copy',  function () { copyMessageFromButton(this); });
+    $('#messages').on('click', '.msg-regen', function () { regenFromButton(this); });
+    $('#messages').on('click', '.msg-edit',  function () { startEditFromButton(this); });
     var lastId = RetroStorage.getCurrentId();
     var convs = RetroStorage.listConversations();
     if (lastId && RetroStorage.getConversation(lastId)) {

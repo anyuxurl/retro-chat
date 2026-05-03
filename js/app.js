@@ -47,10 +47,35 @@
     });
 
     $('#input').on('keydown', function (e) {
-      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
-        e.preventDefault();
-        $('#composer').trigger('submit');
-      }
+      if (e.key !== 'Enter' || e.shiftKey) return;
+      // Multiple ways to detect that the user is mid-IME composition
+      // (Pinyin / Japanese / Korean candidate selection). On iOS Safari
+      // `e.isComposing` is unreliable, so we also track the explicit
+      // composition events and the legacy keyCode 229 (IME processing).
+      if (composing) return;
+      if (e.isComposing === true) return;
+      if (e.keyCode === 229 || e.which === 229) return;
+      e.preventDefault();
+      $('#composer').trigger('submit');
+    });
+    // Composition tracking for the textarea — the IME may also fire its
+    // own `Enter` to confirm the candidate which would otherwise submit
+    // the form. Keep `composing` true through the whole composition
+    // window plus a brief grace period after compositionend, because some
+    // browsers (notably Mobile Safari) deliver the keydown for that final
+    // Enter *after* compositionend has fired.
+    var composing = false;
+    var composeGrace = null;
+    $('#input').on('compositionstart', function () {
+      composing = true;
+      if (composeGrace) { clearTimeout(composeGrace); composeGrace = null; }
+    });
+    $('#input').on('compositionend', function () {
+      if (composeGrace) clearTimeout(composeGrace);
+      composeGrace = setTimeout(function () {
+        composing = false;
+        composeGrace = null;
+      }, 80);
     });
 
     // Conversation list — delegate clicks for items + delete buttons.
@@ -84,6 +109,11 @@
       else openSidebar();
     });
     $('#backdrop').on('click', closeSidebar);
+
+    // Sidebar conversation search — filter on every keystroke.
+    $('#conv-search').on('input', function () {
+      RetroChat.refreshSidebar();
+    });
 
     // Welcome modal buttons.
     $('#btn-welcome-start').on('click', startFromWelcome);

@@ -25,6 +25,9 @@
       <!-- Sidebar / conversation list -->
       <aside id="sidebar" class="sidebar">
         <div class="sidebar-head" data-i18n="sidebar.heading">CONVERSATIONS</div>
+        <div class="sidebar-search-wrap">
+          <input id="conv-search" class="sidebar-search" type="text" data-i18n-placeholder="sidebar.search" placeholder="Search conversations…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        </div>
         <ul id="conv-list" class="conv-list"></ul>
         <div class="sidebar-foot">
           <button id="btn-clear-all" class="linkbtn" type="button" data-i18n="sidebar.clear_all">[ clear all ]</button>
@@ -43,6 +46,7 @@
             <div class="empty-hint" data-i18n="empty.hint2">switch model? press &#9881; in the top bar.</div>
           </div>
         </div>
+        <button id="btn-scroll-bottom" class="scroll-bottom-btn" type="button" data-i18n-aria="scroll.bottom">&#8595;</button>
         <form id="composer" class="composer">
           <textarea id="input" class="input" rows="2" data-i18n-placeholder="composer.placeholder" placeholder="Type a message...  (Shift+Enter for newline)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
           <button id="btn-send" class="sendbtn" type="submit" data-i18n="composer.send">SEND</button>
