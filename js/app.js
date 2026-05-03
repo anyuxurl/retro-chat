@@ -165,4 +165,18 @@
     isTouchPrimary: function () { return TOUCH_PRIMARY; }
   };
 
+  // Register the service worker after the page has fully loaded so its
+  // install-time precache fetches don't compete with first-paint resources
+  // on slow devices. SW is a progressive enhancement — the app must
+  // continue to work if registration fails (e.g. http://, private mode).
+  if ('serviceWorker' in navigator) {
+    global.addEventListener('load', function () {
+      navigator.serviceWorker.register('/sw.js').catch(function (err) {
+        if (global.console && console.warn) {
+          console.warn('[sw] registration failed:', err);
+        }
+      });
+    });
+  }
+
 })(window, window.jQuery);

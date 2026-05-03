@@ -7,6 +7,19 @@
   <meta name="theme-color" content="#e8e6df">
   <title>RetroChat</title>
   <link rel="stylesheet" href="/css/style.css">
+
+  <!-- Icons. Old Safari (iOS 12) ignores the SVG favicon and falls back to
+       favicon-32.png; modern browsers prefer the SVG (theme-adaptive). The
+       apple-touch-icon is the iOS "Add to Home Screen" tile; the manifest
+       drives PWA install on Android / desktop Chrome. -->
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="RetroChat">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
 </head>
 <body class="theme-mac">
 
@@ -41,6 +54,22 @@
       <main class="main">
         <div id="messages" class="messages">
           <div class="empty">
+            <svg class="empty-logo" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true" focusable="false">
+              <g fill="currentColor">
+                <rect x="3" y="4" width="10" height="1"/>
+                <rect x="3" y="5" width="1" height="6"/>
+                <rect x="12" y="5" width="1" height="6"/>
+                <rect x="3" y="11" width="10" height="1"/>
+                <rect x="5" y="12" width="2" height="1"/>
+                <rect x="5" y="13" width="1" height="1"/>
+                <rect x="5" y="5" width="1" height="1"/>
+                <rect x="6" y="6" width="1" height="1"/>
+                <rect x="7" y="7" width="1" height="1"/>
+                <rect x="6" y="8" width="1" height="1"/>
+                <rect x="5" y="9" width="1" height="1"/>
+                <rect x="9" y="6" width="2" height="4"/>
+              </g>
+            </svg>
             <div class="empty-title" data-i18n="empty.title">&gt; RetroChat ready.</div>
             <div class="empty-hint" data-i18n="empty.hint1">type a message and press send.</div>
             <div class="empty-hint" data-i18n="empty.hint2">switch model? press &#9881; in the top bar.</div>

@@ -48,6 +48,28 @@
     activeStream: null
   };
 
+  // Pixel-art logo for the empty conversation state. Mirrored from the
+  // static one in index.html: same shapes, no <rect> background fill,
+  // currentColor so each theme's .empty colour drives the foreground.
+  var EMPTY_LOGO_HTML = (
+    '<svg class="empty-logo" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true" focusable="false">' +
+      '<g fill="currentColor">' +
+        '<rect x="3" y="4" width="10" height="1"/>' +
+        '<rect x="3" y="5" width="1" height="6"/>' +
+        '<rect x="12" y="5" width="1" height="6"/>' +
+        '<rect x="3" y="11" width="10" height="1"/>' +
+        '<rect x="5" y="12" width="2" height="1"/>' +
+        '<rect x="5" y="13" width="1" height="1"/>' +
+        '<rect x="5" y="5" width="1" height="1"/>' +
+        '<rect x="6" y="6" width="1" height="1"/>' +
+        '<rect x="7" y="7" width="1" height="1"/>' +
+        '<rect x="6" y="8" width="1" height="1"/>' +
+        '<rect x="5" y="9" width="1" height="1"/>' +
+        '<rect x="9" y="6" width="2" height="4"/>' +
+      '</g>' +
+    '</svg>'
+  );
+
   function escapeHtml(s) {
     return String(s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -220,8 +242,14 @@
     $msgs.empty();
     if (!state.messages.length) {
       var $empty = $('<div class="empty"></div>');
-      $empty.append($('<div class="empty-title"></div>').text(RetroI18n.t('empty.title_new')));
-      $empty.append($('<div class="empty-hint"></div>').text(RetroI18n.t('empty.hint_new')));
+      // SVG markup is identical to the static one in index.html so the
+      // logo never disappears across the HTML→JS hydration boundary.
+      // Kept as a string (not a $('<svg>') call) because jQuery slim's
+      // createElement path doesn't apply the SVG namespace.
+      $empty.append(EMPTY_LOGO_HTML);
+      $empty.append($('<div class="empty-title"></div>').text(RetroI18n.t('empty.title')));
+      $empty.append($('<div class="empty-hint"></div>').text(RetroI18n.t('empty.hint1')));
+      $empty.append($('<div class="empty-hint"></div>').text(RetroI18n.t('empty.hint2')));
       $msgs.append($empty);
       return;
     }

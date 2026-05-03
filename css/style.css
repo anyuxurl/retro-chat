@@ -304,6 +304,17 @@ body {
 }
 .empty-title { font-weight: bold; margin-bottom: 8px; }
 .empty-hint  { opacity: 0.8; }
+.empty-logo {
+  display: block;
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 14px;
+  /* Belt-and-braces with shape-rendering inside the SVG: keep edges crisp
+     even when the browser zoom puts us on a fractional device-pixel grid. */
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: pixelated;
+  opacity: 0.85;
+}
 
 /* Messages */
 .msg {

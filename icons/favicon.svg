@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  RetroChat — favicon (transparent, auto-adapts to browser tab color scheme).
+  Modern browsers (Firefox, Chromium-based, recent Safari) honour the
+  prefers-color-scheme media query inside SVG. Older browsers fall back to
+  the bundled favicon-32.png via the alternate <link> in index.html.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges">
+  <style>
+    .fg { fill: #1a1a1a; }
+    @media (prefers-color-scheme: dark) {
+      .fg { fill: #00ff66; }
+    }
+  </style>
+  <g class="fg">
+    <rect x="3" y="4" width="10" height="1"/>
+    <rect x="3" y="5" width="1" height="6"/>
+    <rect x="12" y="5" width="1" height="6"/>
+    <rect x="3" y="11" width="10" height="1"/>
+    <rect x="5" y="12" width="2" height="1"/>
+    <rect x="5" y="13" width="1" height="1"/>
+    <rect x="5" y="5" width="1" height="1"/>
+    <rect x="6" y="6" width="1" height="1"/>
+    <rect x="7" y="7" width="1" height="1"/>
+    <rect x="6" y="8" width="1" height="1"/>
+    <rect x="5" y="9" width="1" height="1"/>
+    <rect x="9" y="6" width="2" height="4"/>
+  </g>
+</svg>
