@@ -10,9 +10,9 @@
   var KEY_WELCOMED = 'retrochat:welcomed';
 
   var DEFAULT_CONFIG = {
-    preset: 'mimo',  // 'mimo' | 'deepseek' | 'custom' | (future preset keys)
+    preset: 'mimo',  // 'mimo' | 'custom' | (future preset keys)
     baseUrl: '',     // only used when preset === 'custom'
-    apiKey: '',      // used when the chosen preset's requiresApiKey is true
+    apiKey: '',      // only used when preset === 'custom' (mimo uses server env)
     model: 'mimo-v2.5-pro',  // only used when preset === 'custom'
     temperature: 0.7,
     systemPrompt: '',
@@ -35,7 +35,8 @@
   //   fixedModel        : model id sent to the upstream
   //   requiresBaseUrl   : show the Base URL input (only true for 'custom')
   //   requiresApiKey    : show the API Key input (server provides for
-  //                       'mimo'; user must provide for 'deepseek' etc.)
+  //                       'mimo'; a future preset that talks to a third-
+  //                       party endpoint would set this true)
   //   requiresModel     : show the Model input (only true for 'custom')
   var PRESETS = {
     mimo: {
@@ -44,14 +45,6 @@
       fixedModel: 'mimo-v2.5-pro',
       requiresBaseUrl: false,
       requiresApiKey: false,
-      requiresModel: false
-    },
-    deepseek: {
-      label: 'DeepSeek',
-      fixedBaseUrl: 'https://api.deepseek.com',
-      fixedModel: 'deepseek-chat',
-      requiresBaseUrl: false,
-      requiresApiKey: true,             // user supplies
       requiresModel: false
     }
     // 'custom' is implicit — selecting it shows all three inputs and
@@ -116,13 +109,18 @@
         merged[k] = (k in c) ? c[k] : DEFAULT_CONFIG[k];
       }
     }
-    // Legacy migration: configs saved before the preset field existed only
-    // had baseUrl/apiKey/model. Infer the preset from those values so the
-    // settings UI doesn't suddenly drop into "custom" for existing users.
+    // Migrate legacy / removed presets to a current option. mimo and
+    // custom are the only valid choices today; everything else (e.g. an
+    // older config that picked 'deepseek' before that preset was
+    // removed, or a downgrade from a future build with extra presets)
+    // collapses to 'custom' so the user's saved baseUrl / apiKey /
+    // model continue to work without forcing reconfiguration.
     if (!c || !('preset' in c)) {
-      if (!merged.baseUrl && !merged.apiKey)                  merged.preset = 'mimo';
-      else if (merged.baseUrl === 'https://api.deepseek.com') merged.preset = 'deepseek';
-      else                                                    merged.preset = 'custom';
+      // Pre-preset-field config — infer from the credential values.
+      if (!merged.baseUrl && !merged.apiKey) merged.preset = 'mimo';
+      else                                   merged.preset = 'custom';
+    } else if (merged.preset !== 'mimo' && merged.preset !== 'custom') {
+      merged.preset = 'custom';
     }
     return merged;
   }

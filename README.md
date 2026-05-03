@@ -9,7 +9,7 @@ RetroChat 是面向**老旧设备**的网页 AI 聊天应用。它的核心目�
 - **极致兼容性**：原生 ES5 + jQuery slim，全部 Flexbox 布局，避免 ReadableStream / 可选链 / CSS Grid 等老 Safari 不支持的特性
 - **流式响应**：通过 XHR `onprogress` 增量读取 `responseText` 实现 SSE 流式输出，无需 ReadableStream
 - **零后端存储**：会话和密钥仅存在浏览器 localStorage，可一键导入/导出 JSON
-- **多模型支持**：内置小米 MiMo、DeepSeek、Qwen、Kimi、本地 Ollama 等预设；任意 OpenAI 兼容 API 都能用
+- **多模型支持**：内置小米 MiMo 开箱即用，自定义任意 OpenAI 兼容 API（DeepSeek、通义、Kimi、本地 Ollama 等）
 - **复古主题**：CRT 绿屏 / 老 Mac 灰白 双主题切换
 - **Vercel 一键部署**：一个 Serverless Function 做 SSE 代理，前端纯静态
 
@@ -89,7 +89,7 @@ Vercel 会自动：
 
 ## 使用其他模型
 
-设置面板里有快速预设（**MiMo / DeepSeek / Custom**）。选 DeepSeek 或 Custom 时**必须**同时填入你自己的 Base URL 和 API Key —— 服务器环境变量只兜底 mimo。
+设置面板里只有两个预设：**MiMo（开箱即用）** 和 **Custom（自定义）**。选 Custom 时填入你自己的 Base URL 和 API Key —— 服务器环境变量只兜底 mimo。
 
 任何符合 OpenAI Chat Completions 协议（`POST /v1/chat/completions` + `stream:true` SSE 输出）的服务都能用，包括：
 
