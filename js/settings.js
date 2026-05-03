@@ -28,6 +28,7 @@
   }
 
   function fillForm(cfg) {
+    el('cfg-preset').value = cfg.preset || 'mimo';
     el('cfg-baseurl').value = cfg.baseUrl || '';
     el('cfg-apikey').value = cfg.apiKey || '';
     el('cfg-model').value = cfg.model || 'mimo-v2.5-pro';
@@ -37,10 +38,12 @@
     el('cfg-theme').value = cfg.theme || 'mac';
     el('cfg-lang').value = cfg.lang || 'auto';
     el('cfg-auto-title').checked = cfg.autoTitle !== false;
+    syncPresetVisibility();
   }
 
   function readForm() {
     return {
+      preset: el('cfg-preset').value || 'mimo',
       baseUrl: (el('cfg-baseurl').value || '').trim().replace(/\/+$/, ''),
       apiKey: (el('cfg-apikey').value || '').trim(),
       model: (el('cfg-model').value || '').trim(),
@@ -52,21 +55,50 @@
     };
   }
 
+  // Show/hide credential rows based on the selected preset's declared
+  // requirements. The preset object lives in storage.js so adding a new
+  // preset is a one-place change.
+  function syncPresetVisibility() {
+    var preset = el('cfg-preset').value || 'mimo';
+    var showBase, showKey, showModel;
+    if (preset === 'custom') {
+      showBase = showKey = showModel = true;
+    } else {
+      var p = RetroStorage.PRESETS[preset];
+      if (!p) { showBase = showKey = showModel = false; }
+      else {
+        showBase  = !!p.requiresBaseUrl;
+        showKey   = !!p.requiresApiKey;
+        showModel = !!p.requiresModel;
+      }
+    }
+    rowFor('cfg-baseurl').toggle(showBase);
+    $('#cfg-baseurl-hint').toggle(showBase);
+    rowFor('cfg-apikey').toggle(showKey);
+    rowFor('cfg-model').toggle(showModel);
+  }
+
+  // Each input lives inside a label.row — find that container.
+  function rowFor(inputId) {
+    return $('#' + inputId).closest('.row');
+  }
+
   function highlightMissing() {
     $('.row-input').removeClass('invalid');
+    var preset = el('cfg-preset').value || 'mimo';
     var ok = true;
-    // Only `model` is strictly required. baseUrl + apiKey may both be empty
-    // (server-side env vars handle it) OR both filled (user-provided creds);
-    // mixing one filled + one empty is invalid.
-    if (!el('cfg-model').value.trim()) {
-      $('#cfg-model').addClass('invalid'); ok = false;
-    }
-    var bu = el('cfg-baseurl').value.trim();
-    var ak = el('cfg-apikey').value.trim();
-    if ((bu && !ak) || (!bu && ak)) {
-      if (!bu) $('#cfg-baseurl').addClass('invalid');
-      if (!ak) $('#cfg-apikey').addClass('invalid');
-      ok = false;
+
+    if (preset === 'custom') {
+      // For custom, all three must be filled — the proxy has no env
+      // fallback for an arbitrary endpoint.
+      if (!el('cfg-baseurl').value.trim()) { $('#cfg-baseurl').addClass('invalid'); ok = false; }
+      if (!el('cfg-apikey').value.trim())  { $('#cfg-apikey').addClass('invalid');  ok = false; }
+      if (!el('cfg-model').value.trim())   { $('#cfg-model').addClass('invalid');   ok = false; }
+    } else {
+      var p = RetroStorage.PRESETS[preset];
+      if (p && p.requiresApiKey && !el('cfg-apikey').value.trim()) {
+        $('#cfg-apikey').addClass('invalid'); ok = false;
+      }
     }
     return ok;
   }
@@ -83,17 +115,23 @@
   }
 
   function applyPreset(key) {
-    if (!key || key === 'custom') return;
-    var p = RetroStorage.PRESETS[key];
-    if (!p) return;
-    el('cfg-baseurl').value = p.baseUrl;
-    el('cfg-model').value = p.model;
+    syncPresetVisibility();
+    // For non-custom presets, fill the (now hidden) baseUrl/model with
+    // canonical values so a later switch back to "custom" starts from a
+    // sensible state, and exported JSON stays self-describing.
+    if (key && key !== 'custom') {
+      var p = RetroStorage.PRESETS[key];
+      if (p) {
+        el('cfg-baseurl').value = p.fixedBaseUrl || '';
+        el('cfg-model').value = p.fixedModel || '';
+      }
+    }
     $('#cfg-baseurl, #cfg-model').removeClass('invalid');
   }
 
   function save() {
-    var data = readForm();
     if (!highlightMissing()) return false;
+    var data = readForm();
     RetroStorage.saveConfig(data);
     applyTheme(data.theme);
     applyLang(data.lang);

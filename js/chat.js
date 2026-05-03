@@ -203,9 +203,12 @@
       editAndResend(idx, newText);
     });
     $ta.on('keydown', function (e) {
-      // Enter without shift saves (consistent with the composer); guard
-      // against IME composition just like the composer does.
       if (e.key !== 'Enter' || e.shiftKey) return;
+      // Match the composer behaviour: on touch devices Enter inserts a
+      // newline (use the save button instead); on desktop Enter saves,
+      // Shift+Enter inserts a newline. IME guards prevent the
+      // candidate-confirming Enter from triggering save.
+      if (global.RetroApp && global.RetroApp.isTouchPrimary && global.RetroApp.isTouchPrimary()) return;
       if (e.isComposing === true || e.keyCode === 229 || e.which === 229) return;
       e.preventDefault();
       $save.trigger('click');
@@ -410,7 +413,8 @@
     if (state.streaming) return;
     if (!text || !text.trim()) return;
     var cfg = RetroStorage.getConfig();
-    if (!cfg.model) {
+    var creds = RetroStorage.resolveCreds(cfg);
+    if (!creds.model) {
       RetroSettings.open(true);
       return;
     }
@@ -460,11 +464,17 @@
   // placeholder, opens a stream, and wires up the delta/done/error handlers.
   function runTurn() {
     var cfg = RetroStorage.getConfig();
-    if (!cfg.model) { RetroSettings.open(true); return; }
+    var creds = RetroStorage.resolveCreds(cfg);
+    if (!creds.model) { RetroSettings.open(true); return; }
 
     var aiMsg = { role: 'assistant', content: '', reasoning: '', ts: Date.now() };
     state.messages.push(aiMsg);
     var $row = appendMessage(aiMsg);
+    // Mark this row as actively streaming so CSS can hide the per-message
+    // actions (copy / regenerate) until the reply has actually arrived.
+    // Showing a "regenerate" button on an empty bubble is jarring, and
+    // copying mid-stream gives a partial paste.
+    $row.addClass('streaming');
     var $content = $row.find('.content');
     var $bubble = $row.find('.bubble');
     var $reasoning = null;
@@ -480,9 +490,9 @@
     }
 
     var payload = {
-      baseUrl: cfg.baseUrl,
-      apiKey: cfg.apiKey,
-      model: cfg.model,
+      baseUrl: creds.baseUrl,
+      apiKey: creds.apiKey,
+      model: creds.model,
       temperature: Number(cfg.temperature) || 0.7,
       messages: apiMessages
     };
@@ -519,6 +529,7 @@
         // Force a final flush so the user sees the complete, fully-parsed
         // markdown (the throttled version may still be 80ms behind).
         renderContentNow();
+        $row.removeClass('streaming');
         setStreamingUI(false);
         state.activeStream = null;
         persist();
@@ -527,6 +538,7 @@
       },
       onError: function (msg) {
         renderContentNow();
+        $row.removeClass('streaming');
         setStreamingUI(false);
         state.activeStream = null;
         var errText = '\n\n' + RetroI18n.t('msg.error_prefix') + msg;
@@ -657,10 +669,11 @@
     var userBody = truncate(firstUser, 400) + '\n\n---\n\n' + truncate(firstAsst, 600);
 
     var collected = '';
+    var titleCreds = RetroStorage.resolveCreds(cfg);
     RetroStream.streamChat({
-      baseUrl: cfg.baseUrl,
-      apiKey: cfg.apiKey,
-      model: cfg.model,
+      baseUrl: titleCreds.baseUrl,
+      apiKey: titleCreds.apiKey,
+      model: titleCreds.model,
       temperature: 0.3,
       messages: [
         { role: 'system', content: sysPrompt },
@@ -715,6 +728,9 @@
       state.activeStream.abort();
       state.activeStream = null;
     }
+    // The streaming row's actions stayed hidden via .streaming; reveal them
+    // now that the user has explicitly stopped the response.
+    $('#messages .msg.streaming').removeClass('streaming');
     setStreamingUI(false);
     persist();
   }

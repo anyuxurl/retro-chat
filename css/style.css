@@ -586,6 +586,10 @@ body {
   justify-content: flex-end;
   gap: 6px;
 }
+/* Hide assistant actions while the reply is still streaming — showing a
+   "regenerate" button on a partial answer is confusing, and copy would
+   capture only what's arrived so far. They reappear on onDone/Error. */
+.msg.streaming .msg-actions { display: none; }
 .msg-btn {
   font-family: inherit;
   font-size: 10px;

@@ -7,6 +7,17 @@
     return window.matchMedia && window.matchMedia('(max-width: 640px)').matches;
   }
 
+  // True on phones / tablets where the soft keyboard has no Shift+Enter
+  // affordance. On those devices we let Enter insert a newline (default
+  // textarea behaviour) and require an explicit SEND tap. On desktop
+  // Enter still submits, Shift+Enter still inserts a newline.
+  function isTouchPrimary() {
+    if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) return true;
+    if ('ontouchstart' in window && (!window.matchMedia || !window.matchMedia('(pointer: fine)').matches)) return true;
+    return false;
+  }
+  var TOUCH_PRIMARY = isTouchPrimary();
+
   function openSidebar()  { $('#sidebar, #backdrop').addClass('open'); }
   function closeSidebar() { $('#sidebar, #backdrop').removeClass('open'); }
 
@@ -48,10 +59,14 @@
 
     $('#input').on('keydown', function (e) {
       if (e.key !== 'Enter' || e.shiftKey) return;
-      // Multiple ways to detect that the user is mid-IME composition
-      // (Pinyin / Japanese / Korean candidate selection). On iOS Safari
-      // `e.isComposing` is unreliable, so we also track the explicit
-      // composition events and the legacy keyCode 229 (IME processing).
+      // Touch devices: Enter always inserts a newline. Soft keyboards
+      // have no Shift+Enter, so users would otherwise be unable to
+      // produce a newline at all. They use the SEND button to submit.
+      if (TOUCH_PRIMARY) return;
+      // IME composition guards (Pinyin / Japanese / Korean candidate
+      // selection). isComposing is unreliable on some Safari builds, so
+      // we also track explicit composition events and the legacy
+      // keyCode 229 ("IME processing").
       if (composing) return;
       if (e.isComposing === true) return;
       if (e.keyCode === 229 || e.which === 229) return;
@@ -143,5 +158,11 @@
       showWelcome();
     }
   });
+
+  // Expose what other modules might need (currently just the touch
+  // detection used by the inline message editor).
+  global.RetroApp = {
+    isTouchPrimary: function () { return TOUCH_PRIMARY; }
+  };
 
 })(window, window.jQuery);

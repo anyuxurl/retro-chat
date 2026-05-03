@@ -10,9 +10,10 @@
   var KEY_WELCOMED = 'retrochat:welcomed';
 
   var DEFAULT_CONFIG = {
-    baseUrl: '',     // empty → backend uses MIMO_BASE_URL env var
-    apiKey: '',      // empty → backend uses MIMO_API_KEY env var
-    model: 'mimo-v2.5-pro',
+    preset: 'mimo',  // 'mimo' | 'deepseek' | 'custom' | (future preset keys)
+    baseUrl: '',     // only used when preset === 'custom'
+    apiKey: '',      // used when the chosen preset's requiresApiKey is true
+    model: 'mimo-v2.5-pro',  // only used when preset === 'custom'
     temperature: 0.7,
     systemPrompt: '',
     theme: 'mac',
@@ -20,21 +21,73 @@
     autoTitle: true
   };
 
-  // Keep this list short — most users want mimo or deepseek; everything
-  // else can be entered manually via "Custom".
-  // Note: the mimo preset deliberately leaves baseUrl empty so requests fall
-  // through to the server-side env defaults instead of exposing the URL in
-  // the bundled JS. Users wanting a non-default mimo gateway can fill it in.
+  // Built-in presets. Each preset declares which credential/config fields
+  // the user actually has to supply — the settings panel reads these flags
+  // to decide which inputs to show. To add a new preset later: append a
+  // new entry here, optionally add a localised label string in i18n, and
+  // an <option> in index.html. No other code changes are required.
+  //
+  // Field semantics:
+  //   label             : fallback label shown when no i18n key is hit
+  //   fixedBaseUrl      : the URL the proxy will use when the user picks
+  //                       this preset. '' means "let the server fall back
+  //                       to its MIMO_BASE_URL env var".
+  //   fixedModel        : model id sent to the upstream
+  //   requiresBaseUrl   : show the Base URL input (only true for 'custom')
+  //   requiresApiKey    : show the API Key input (server provides for
+  //                       'mimo'; user must provide for 'deepseek' etc.)
+  //   requiresModel     : show the Model input (only true for 'custom')
   var PRESETS = {
     mimo: {
-      baseUrl: '',
-      model: 'mimo-v2.5-pro'
+      label: 'Xiaomi MiMo v2.5 Pro',
+      fixedBaseUrl: '',                 // server env handles it
+      fixedModel: 'mimo-v2.5-pro',
+      requiresBaseUrl: false,
+      requiresApiKey: false,
+      requiresModel: false
     },
     deepseek: {
-      baseUrl: 'https://api.deepseek.com',
-      model: 'deepseek-chat'
+      label: 'DeepSeek',
+      fixedBaseUrl: 'https://api.deepseek.com',
+      fixedModel: 'deepseek-chat',
+      requiresBaseUrl: false,
+      requiresApiKey: true,             // user supplies
+      requiresModel: false
     }
+    // 'custom' is implicit — selecting it shows all three inputs and
+    // sources baseUrl/model from the user's saved config directly.
   };
+
+  // Resolve the credentials/model that should be sent to /api/chat for a
+  // given config. Single source of truth used by chat.js when issuing the
+  // streaming request, so the rest of the code never has to branch on
+  // preset selection.
+  function resolveCreds(cfg) {
+    cfg = cfg || getConfig();
+    var preset = cfg.preset || 'mimo';
+    if (preset === 'custom') {
+      return {
+        baseUrl: cfg.baseUrl || '',
+        apiKey: cfg.apiKey || '',
+        model: cfg.model || ''
+      };
+    }
+    var p = PRESETS[preset];
+    if (!p) {
+      // Unknown preset (e.g. removed in a later version) — fall through
+      // to whatever the user has saved as if it were custom.
+      return {
+        baseUrl: cfg.baseUrl || '',
+        apiKey: cfg.apiKey || '',
+        model: cfg.model || ''
+      };
+    }
+    return {
+      baseUrl: p.fixedBaseUrl,
+      apiKey: p.requiresApiKey ? (cfg.apiKey || '') : '',
+      model: p.fixedModel
+    };
+  }
 
   function safeGet(key) {
     try {
@@ -62,6 +115,14 @@
       if (Object.prototype.hasOwnProperty.call(DEFAULT_CONFIG, k)) {
         merged[k] = (k in c) ? c[k] : DEFAULT_CONFIG[k];
       }
+    }
+    // Legacy migration: configs saved before the preset field existed only
+    // had baseUrl/apiKey/model. Infer the preset from those values so the
+    // settings UI doesn't suddenly drop into "custom" for existing users.
+    if (!c || !('preset' in c)) {
+      if (!merged.baseUrl && !merged.apiKey)                  merged.preset = 'mimo';
+      else if (merged.baseUrl === 'https://api.deepseek.com') merged.preset = 'deepseek';
+      else                                                    merged.preset = 'custom';
     }
     return merged;
   }
@@ -180,6 +241,7 @@
   global.RetroStorage = {
     DEFAULTS: DEFAULT_CONFIG,
     PRESETS: PRESETS,
+    resolveCreds: resolveCreds,
     getConfig: getConfig,
     saveConfig: saveConfig,
     listConversations: listConversations,
