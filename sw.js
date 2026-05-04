@@ -17,7 +17,7 @@
 (function () {
   'use strict';
 
-  var CACHE_VERSION = 'v2';
+  var CACHE_VERSION = 'v3';
   var CACHE_NAME = 'retrochat-' + CACHE_VERSION;
 
   // Same-origin URLs MUST succeed at install or the SW won't activate.

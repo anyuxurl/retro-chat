@@ -861,13 +861,16 @@ body {
   flex: 1;
   text-align: left;
 }
-.welcome-foot .ghostbtn {
+.welcome-foot .ghostbtn,
+.welcome-foot .primarybtn {
   -webkit-box-flex: 0;
   -webkit-flex: 0 0 auto;
   flex: 0 0 auto;
   margin: 0;
-  padding: 8px 16px;
-}
-.welcome-foot .primarybtn {
   padding: 10px 22px;
+  font-size: 13px;
+  letter-spacing: 1.5px;
 }
+/* Hierarchy now comes purely from font-weight (primary stays bold via the
+   base .primarybtn rule); the box dimensions are identical so the two
+   buttons read as a balanced pair instead of mismatched siblings. */
