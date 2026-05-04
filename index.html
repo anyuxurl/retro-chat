@@ -6,6 +6,12 @@
   <meta name="format-detection" content="telephone=no">
   <meta name="theme-color" content="#e8e6df">
   <title>RetroChat</title>
+  <!-- Inline first-paint background. Without this, the moment between
+       iOS dismissing the PWA splash and the external stylesheet applying
+       briefly shows the browser default (white), creating a visible flash
+       on home-screen launches. Matching the manifest background_color
+       keeps the transition splash → page render visually continuous. -->
+  <style>html,body{background:#e8e6df;margin:0}</style>
   <link rel="stylesheet" href="/css/style.css">
 
   <!-- Icons. Old Safari (iOS 12) ignores the SVG favicon and falls back to

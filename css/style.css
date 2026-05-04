@@ -714,12 +714,21 @@ body {
     z-index: 10;
     -webkit-transform: translateX(-100%);
     transform: translateX(-100%);
-    -webkit-transition: -webkit-transform 0.2s ease;
-    transition: transform 0.2s ease;
+    /* visibility: hidden takes the off-canvas search input out of the
+       focus chain, which prevents iOS Safari from showing the
+       prev/next arrows in the keyboard accessory bar while the user
+       is typing in the composer. The visibility flip is delayed by
+       the transform duration so the slide-out animation still plays. */
+    visibility: hidden;
+    -webkit-transition: -webkit-transform 0.2s ease, visibility 0s linear 0.2s;
+    transition: transform 0.2s ease, visibility 0s linear 0.2s;
   }
   .sidebar.open {
     -webkit-transform: translateX(0);
     transform: translateX(0);
+    visibility: visible;
+    -webkit-transition: -webkit-transform 0.2s ease, visibility 0s linear 0s;
+    transition: transform 0.2s ease, visibility 0s linear 0s;
   }
   .backdrop.open { display: block; }
   .row-hint { margin-left: 0; }
