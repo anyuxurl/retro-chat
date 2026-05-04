@@ -17,7 +17,7 @@
 (function () {
   'use strict';
 
-  var CACHE_VERSION = 'v4';
+  var CACHE_VERSION = 'v5';
   var CACHE_NAME = 'retrochat-' + CACHE_VERSION;
 
   // Same-origin URLs MUST succeed at install or the SW won't activate.
@@ -40,7 +40,9 @@
     '/icons/icon-192.png',
     '/icons/icon-512.png',
     '/icons/icon-mac.svg',
-    '/icons/icon-crt.svg'
+    '/icons/icon-crt.svg',
+    '/icons/splash-iphone5s.png',
+    '/icons/splash-iphone678.png'
   ];
 
   // Cross-origin (CDN) — tolerate failure so a flaky CDN doesn't brick
