@@ -17,7 +17,7 @@
 (function () {
   'use strict';
 
-  var CACHE_VERSION = 'v1';
+  var CACHE_VERSION = 'v2';
   var CACHE_NAME = 'retrochat-' + CACHE_VERSION;
 
   // Same-origin URLs MUST succeed at install or the SW won't activate.
@@ -31,6 +31,7 @@
     '/js/chat.js',
     '/js/settings.js',
     '/js/app.js',
+    '/js/analytics.js',
     '/manifest.webmanifest',
     '/icons/favicon.svg',
     '/icons/favicon-16.png',

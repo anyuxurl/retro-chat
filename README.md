@@ -77,6 +77,19 @@ Vercel 会自动：
 
 > **注意**：Hobby 套餐 Function 单次响应上限 10 秒。如果你的模型响应较长，建议 Pro 套餐（60s）或在客户端设置 `maxTokens` 上限。
 
+## Web Analytics
+
+部署到 Vercel 后默认接入了 [Vercel Web Analytics](https://vercel.com/docs/analytics)，统计聚合的页面访问量、访问国家、设备类型 —— **不使用 cookie、不做指纹识别、不收集个人数据**，符合 GDPR / CCPA。
+
+要让它生效，需要在 Vercel Dashboard → Analytics 标签页手动 **Enable** 一次。
+
+不想要的话：
+
+1. 删掉 `index.html` 里 `<script src="/js/analytics.js"></script>` 这行
+2. 在 Dashboard 关掉 Analytics
+
+> RetroChat 的核心隐私承诺不变：**所有会话内容和 API Key 仍然只存在你的浏览器 localStorage**，从未上传到任何后端（除了你配置的 AI endpoint）。
+
 ## 凭据优先级
 
 后端 `api/chat.js` 按以下顺序选用上游凭据：
