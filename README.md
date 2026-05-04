@@ -11,6 +11,7 @@ RetroChat 是面向**老旧设备**的网页 AI 聊天应用。它的核心目�
 - **零后端存储**：会话和密钥仅存在浏览器 localStorage，可一键导入/导出 JSON
 - **多模型支持**：内置小米 MiMo 开箱即用，自定义任意 OpenAI 兼容 API（DeepSeek、通义、Kimi、本地 Ollama 等）
 - **复古主题**：CRT 绿屏 / 老 Mac 灰白 双主题切换
+- **PWA 安装**：可"添加到主屏幕"作为独立 app 启动；Service Worker 离线缓存让重复访问几乎秒开（iPhone 5s / iOS 12 同样支持）
 - **Vercel 一键部署**：一个 Serverless Function 做 SSE 代理，前端纯静态
 
 ## 项目结构
@@ -123,7 +124,6 @@ Vercel 会自动：
 
 ## 已知限制
 
-- 老 Safari（iOS < 14）不支持 Service Worker 离线缓存，所以 RetroChat 没有 PWA
 - 长对话超过浏览器 localStorage 容量（约 5MB）时会自动剔除最旧会话
 - iOS 12 可能不支持部分新 Markdown 特性（如表格渲染样式）
 
