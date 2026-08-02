@@ -28,10 +28,10 @@
   }
 
   function fillForm(cfg) {
-    el('cfg-preset').value = cfg.preset || 'mimo';
+    el('cfg-preset').value = cfg.preset || 'preset';
     el('cfg-baseurl').value = cfg.baseUrl || '';
     el('cfg-apikey').value = cfg.apiKey || '';
-    el('cfg-model').value = cfg.model || 'mimo-v2.5-pro';
+    el('cfg-model').value = cfg.model || '';
     el('cfg-temperature').value = cfg.temperature != null ? cfg.temperature : 0.7;
     el('cfg-temperature-val').textContent = (cfg.temperature != null ? cfg.temperature : 0.7);
     el('cfg-system-prompt').value = cfg.systemPrompt || '';
@@ -43,7 +43,7 @@
 
   function readForm() {
     return {
-      preset: el('cfg-preset').value || 'mimo',
+      preset: el('cfg-preset').value || 'preset',
       baseUrl: (el('cfg-baseurl').value || '').trim().replace(/\/+$/, ''),
       apiKey: (el('cfg-apikey').value || '').trim(),
       model: (el('cfg-model').value || '').trim(),
@@ -59,7 +59,7 @@
   // requirements. The preset object lives in storage.js so adding a new
   // preset is a one-place change.
   function syncPresetVisibility() {
-    var preset = el('cfg-preset').value || 'mimo';
+    var preset = el('cfg-preset').value || 'preset';
     var showBase, showKey, showModel;
     if (preset === 'custom') {
       showBase = showKey = showModel = true;
@@ -85,7 +85,7 @@
 
   function highlightMissing() {
     $('.row-input').removeClass('invalid');
-    var preset = el('cfg-preset').value || 'mimo';
+    var preset = el('cfg-preset').value || 'preset';
     var ok = true;
 
     if (preset === 'custom') {

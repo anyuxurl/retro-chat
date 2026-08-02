@@ -10,10 +10,10 @@
   var KEY_WELCOMED = 'retrochat:welcomed';
 
   var DEFAULT_CONFIG = {
-    preset: 'mimo',  // 'mimo' | 'custom' | (future preset keys)
+    preset: 'preset',  // 'preset' | 'custom'
     baseUrl: '',     // only used when preset === 'custom'
-    apiKey: '',      // only used when preset === 'custom' (mimo uses server env)
-    model: 'mimo-v2.5-pro',  // only used when preset === 'custom'
+    apiKey: '',      // only used when preset === 'custom' (preset uses server env)
+    model: '',       // only used when preset === 'custom'
     temperature: 0.7,
     systemPrompt: '',
     theme: 'mac',
@@ -31,18 +31,19 @@
   //   label             : fallback label shown when no i18n key is hit
   //   fixedBaseUrl      : the URL the proxy will use when the user picks
   //                       this preset. '' means "let the server fall back
-  //                       to its MIMO_BASE_URL env var".
-  //   fixedModel        : model id sent to the upstream
+  //                       to its PRESET_BASE_URL env var".
+  //   fixedModel        : model id sent to the upstream. '' means "let the
+  //                       server fall back to its PRESET_MODEL env var".
   //   requiresBaseUrl   : show the Base URL input (only true for 'custom')
   //   requiresApiKey    : show the API Key input (server provides for
-  //                       'mimo'; a future preset that talks to a third-
+  //                       'preset'; a future preset that talks to a third-
   //                       party endpoint would set this true)
   //   requiresModel     : show the Model input (only true for 'custom')
   var PRESETS = {
-    mimo: {
-      label: 'Xiaomi MiMo v2.5 Pro',
+    preset: {
+      label: 'Preset',
       fixedBaseUrl: '',                 // server env handles it
-      fixedModel: 'mimo-v2.5-pro',
+      fixedModel: '',                   // server env handles it
       requiresBaseUrl: false,
       requiresApiKey: false,
       requiresModel: false
@@ -54,31 +55,28 @@
   // Resolve the credentials/model that should be sent to /api/chat for a
   // given config. Single source of truth used by chat.js when issuing the
   // streaming request, so the rest of the code never has to branch on
-  // preset selection.
+  // preset selection. The returned `complete` flag says whether the request
+  // can be issued at all: the server preset is always complete (env vars
+  // fill everything in), custom needs all three fields filled locally.
   function resolveCreds(cfg) {
     cfg = cfg || getConfig();
-    var preset = cfg.preset || 'mimo';
-    if (preset === 'custom') {
+    var preset = cfg.preset || 'preset';
+    if (preset === 'custom' || !PRESETS[preset]) {
+      // Custom, or an unknown preset (e.g. removed in a later version) —
+      // use whatever the user has saved as if it were custom.
       return {
         baseUrl: cfg.baseUrl || '',
         apiKey: cfg.apiKey || '',
-        model: cfg.model || ''
+        model: cfg.model || '',
+        complete: !!(cfg.baseUrl && cfg.apiKey && cfg.model)
       };
     }
     var p = PRESETS[preset];
-    if (!p) {
-      // Unknown preset (e.g. removed in a later version) — fall through
-      // to whatever the user has saved as if it were custom.
-      return {
-        baseUrl: cfg.baseUrl || '',
-        apiKey: cfg.apiKey || '',
-        model: cfg.model || ''
-      };
-    }
     return {
       baseUrl: p.fixedBaseUrl,
       apiKey: p.requiresApiKey ? (cfg.apiKey || '') : '',
-      model: p.fixedModel
+      model: p.fixedModel,
+      complete: p.requiresApiKey ? !!cfg.apiKey : true
     };
   }
 
@@ -109,17 +107,21 @@
         merged[k] = (k in c) ? c[k] : DEFAULT_CONFIG[k];
       }
     }
-    // Migrate legacy / removed presets to a current option. mimo and
-    // custom are the only valid choices today; everything else (e.g. an
-    // older config that picked 'deepseek' before that preset was
-    // removed, or a downgrade from a future build with extra presets)
-    // collapses to 'custom' so the user's saved baseUrl / apiKey /
-    // model continue to work without forcing reconfiguration.
+    // Migrate legacy / removed presets to a current option. 'preset' and
+    // 'custom' are the only valid choices today. The old default was named
+    // 'mimo' — that maps to 'preset' (same behaviour: server env supplies
+    // everything). Anything else (e.g. an older config that picked
+    // 'deepseek', or a downgrade from a future build with extra presets)
+    // collapses to 'custom' so the user's saved baseUrl / apiKey / model
+    // continue to work without forcing reconfiguration.
     if (!c || !('preset' in c)) {
       // Pre-preset-field config — infer from the credential values.
-      if (!merged.baseUrl && !merged.apiKey) merged.preset = 'mimo';
+      if (!merged.baseUrl && !merged.apiKey) merged.preset = 'preset';
       else                                   merged.preset = 'custom';
-    } else if (merged.preset !== 'mimo' && merged.preset !== 'custom') {
+    } else if (merged.preset === 'mimo') {
+      merged.preset = 'preset';
+      merged.model = '';  // old fixed model id no longer applies
+    } else if (merged.preset !== 'preset' && merged.preset !== 'custom') {
       merged.preset = 'custom';
     }
     return merged;

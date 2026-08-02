@@ -442,7 +442,7 @@
     if (!text || !text.trim()) return;
     var cfg = RetroStorage.getConfig();
     var creds = RetroStorage.resolveCreds(cfg);
-    if (!creds.model) {
+    if (!creds.complete) {
       RetroSettings.open(true);
       return;
     }
@@ -493,7 +493,7 @@
   function runTurn() {
     var cfg = RetroStorage.getConfig();
     var creds = RetroStorage.resolveCreds(cfg);
-    if (!creds.model) { RetroSettings.open(true); return; }
+    if (!creds.complete) { RetroSettings.open(true); return; }
 
     var aiMsg = { role: 'assistant', content: '', reasoning: '', ts: Date.now() };
     state.messages.push(aiMsg);

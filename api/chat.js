@@ -57,29 +57,37 @@ module.exports = async function handler(req, res) {
   const maxTokens = typeof body.maxTokens === 'number' ? body.maxTokens : undefined;
 
   // Fall back to server-side env vars when the client didn't provide creds.
-  // This lets you bake the default mimo endpoint + key into Vercel env vars
-  // (MIMO_BASE_URL / MIMO_API_KEY) without exposing them in the bundled JS.
+  // This lets you bake the default preset endpoint + key + model into Vercel
+  // env vars (PRESET_BASE_URL / PRESET_API_KEY / PRESET_MODEL) without
+  // exposing them in the bundled JS. Legacy MIMO_* names are still honoured.
   // We only fall back when BOTH baseUrl and apiKey are empty — mixing a
   // user-supplied baseUrl with the env key (or vice-versa) would silently
   // send the wrong key upstream.
   let upstreamBaseUrl = baseUrl;
   let upstreamApiKey = apiKey;
+  let upstreamModel = model;
   let usedEnvFallback = false;
   if (!upstreamBaseUrl && !upstreamApiKey) {
-    upstreamBaseUrl = trimSlash(process.env.MIMO_BASE_URL || '');
-    upstreamApiKey = process.env.MIMO_API_KEY || '';
+    upstreamBaseUrl = trimSlash(process.env.PRESET_BASE_URL || process.env.MIMO_BASE_URL || '');
+    upstreamApiKey = process.env.PRESET_API_KEY || process.env.MIMO_API_KEY || '';
+    // The preset's model id is server-controlled too; ignore any client
+    // value so the operator can swap models purely from the Vercel dashboard.
+    upstreamModel = process.env.PRESET_MODEL || upstreamModel;
     usedEnvFallback = true;
   }
 
   if (!upstreamBaseUrl) {
     return jsonError(res, 400,
-      'No baseUrl provided and MIMO_BASE_URL env var is not set on the server.');
+      'No baseUrl provided and PRESET_BASE_URL env var is not set on the server.');
   }
   if (!upstreamApiKey) {
     return jsonError(res, 400,
-      'No apiKey provided and MIMO_API_KEY env var is not set on the server.');
+      'No apiKey provided and PRESET_API_KEY env var is not set on the server.');
   }
-  if (!model) return jsonError(res, 400, 'model is required');
+  if (!upstreamModel) {
+    return jsonError(res, 400,
+      'No model provided and PRESET_MODEL env var is not set on the server.');
+  }
   if (!Array.isArray(messages) || messages.length === 0) {
     return jsonError(res, 400, 'messages must be a non-empty array');
   }
@@ -106,7 +114,7 @@ module.exports = async function handler(req, res) {
 
   const upstreamUrl = buildChatUrl(upstreamBaseUrl);
   const payload = {
-    model: model,
+    model: upstreamModel,
     messages: messages,
     temperature: temperature,
     stream: true

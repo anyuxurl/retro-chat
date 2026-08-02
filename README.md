@@ -2,14 +2,14 @@
 
 > 一个能在 iPhone 5s 上跑的 AI 聊天客户端。
 
-RetroChat 是面向**老旧设备**的网页 AI 聊天应用。它的核心目标是在 iPhone 5s（iOS 12 / Safari 12）这类 10 年前的设备上仍能流畅使用。默认接入小米 `xiaomi-mimo-v2.5-pro` 模型，并允许用户自定义任意 OpenAI 兼容 endpoint。
+RetroChat 是面向**老旧设备**的网页 AI 聊天应用。它的核心目标是在 iPhone 5s（iOS 12 / Safari 12）这类 10 年前的设备上仍能流畅使用。默认接入由服务器环境变量配置的预设模型，并允许用户自定义任意 OpenAI 兼容 endpoint。
 
 ## 特点
 
 - **极致兼容性**：原生 ES5 + jQuery slim，全部 Flexbox 布局，避免 ReadableStream / 可选链 / CSS Grid 等老 Safari 不支持的特性
 - **流式响应**：通过 XHR `onprogress` 增量读取 `responseText` 实现 SSE 流式输出，无需 ReadableStream
 - **零后端存储**：会话和密钥仅存在浏览器 localStorage，可一键导入/导出 JSON
-- **多模型支持**：内置小米 MiMo 开箱即用，自定义任意 OpenAI 兼容 API（DeepSeek、通义、Kimi、本地 Ollama 等）
+- **多模型支持**：内置预设服务开箱即用（Base URL / API Key / 模型 ID 全部在 Vercel 环境变量配置），也可自定义任意 OpenAI 兼容 API（DeepSeek、通义、Kimi、本地 Ollama 等）
 - **复古主题**：CRT 绿屏 / 老 Mac 灰白 双主题切换
 - **PWA 安装**：可"添加到主屏幕"作为独立 app 启动；Service Worker 离线缓存让重复访问几乎秒开（iPhone 5s / iOS 12 同样支持）
 - **Vercel 一键部署**：一个 Serverless Function 做 SSE 代理，前端纯静态
@@ -35,9 +35,9 @@ retro-chat/
 ## 本地开发
 
 ```bash
-# 1) 复制环境变量模板，填入你的 mimo Base URL 和 Key
+# 1) 复制环境变量模板，填入你的预设服务 Base URL、Key 和模型 ID
 cp .env.example .env.local
-# 编辑 .env.local，填上 MIMO_BASE_URL 和 MIMO_API_KEY
+# 编辑 .env.local，填上 PRESET_BASE_URL、PRESET_API_KEY 和 PRESET_MODEL
 
 # 2) 启动本地服务（无需安装依赖，纯 Node.js）
 npm run dev
@@ -65,8 +65,11 @@ vercel deploy --prod
 
 | Name | Value | Environments |
 |---|---|---|
-| `MIMO_BASE_URL` | `https://token-plan-cn.xiaomimimo.com/v1` | Production, Preview, Development |
-| `MIMO_API_KEY` | `tp-...` (你的 mimo key) | Production, Preview, Development |
+| `PRESET_BASE_URL` | `https://api.example.com/v1`（你的预设服务地址） | Production, Preview, Development |
+| `PRESET_API_KEY` | `sk-...`（你的预设服务 key） | Production, Preview, Development |
+| `PRESET_MODEL` | 预设服务使用的模型 ID | Production, Preview, Development |
+
+改任何一项后重新部署即可生效，客户端无需更新。
 
 ⚠️ **不要**把 API Key 写进前端代码或 commit 到 git —— 它会暴露在 bundle 里被任何人查看。
 
@@ -95,15 +98,15 @@ Vercel 会自动：
 
 后端 `api/chat.js` 按以下顺序选用上游凭据：
 
-1. **请求体里的 baseUrl + apiKey**（用户在设置面板填的）
-2. **环境变量** `MIMO_BASE_URL` + `MIMO_API_KEY`（兜底默认）
+1. **请求体里的 baseUrl + apiKey + model**（用户在设置面板选"自定义"时填的）
+2. **环境变量** `PRESET_BASE_URL` + `PRESET_API_KEY` + `PRESET_MODEL`（预设服务；旧的 `MIMO_*` 变量名仍兼容）
 3. 都没有 → 返回 400 错误
 
 注意：要么两个都用用户的，要么两个都用环境变量的 —— 不会混搭。如果用户只填了 baseUrl 没填 apiKey（或反之），前端会高亮报错让用户补全。
 
 ## 使用其他模型
 
-设置面板里只有两个预设：**MiMo（开箱即用）** 和 **Custom（自定义）**。选 Custom 时填入你自己的 Base URL 和 API Key —— 服务器环境变量只兜底 mimo。
+设置面板里只有两个预设：**预设服务（开箱即用，由服务器环境变量决定用哪个模型）** 和 **Custom（自定义）**。选 Custom 时填入你自己的 Base URL、API Key 和模型 ID —— 服务器环境变量只服务于预设选项。
 
 任何符合 OpenAI Chat Completions 协议（`POST /v1/chat/completions` + `stream:true` SSE 输出）的服务都能用，包括：
 
