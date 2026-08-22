@@ -3,20 +3,38 @@
 (function (global, $) {
   'use strict';
 
-  // Harden marked's link rendering once at startup. Two goals:
-  //   1) Block dangerous URL schemes (javascript:, vbscript:, data:, file:)
-  //      that would otherwise render as clickable links in AI responses.
-  //   2) Force every external link to open in a new tab without leaking
+  // Harden marked's rendering once at startup. Three goals:
+  //   1) Neutralise raw HTML. marked does NOT sanitize — its `sanitize`
+  //      option was deprecated and defaults to false, so `<img src=x
+  //      onerror=...>` in a model reply would otherwise render live and
+  //      could exfiltrate the API key out of localStorage. We escape every
+  //      raw HTML token instead of filtering a tag allowlist: strictly
+  //      safer, zero extra bytes, and no DOMPurify dependency to audit for
+  //      iOS 12 support. Trade-off: a model that emits literal HTML sees it
+  //      shown as text. GFM tables and `breaks: true` newlines are produced
+  //      by marked's own renderers, so normal formatting is unaffected.
+  //   2) Block dangerous URL schemes (javascript:, vbscript:, data:, file:)
+  //      on both links and images.
+  //   3) Force every external link to open in a new tab without leaking
   //      the referrer / opener handle back to the destination.
   if (global.marked && typeof global.marked.use === 'function') {
     global.marked.use({
       renderer: {
+        html: function (raw) { return escapeHtml(raw); },
         link: function (href, title, text) {
           if (!isSafeHref(href)) return text;        // strip the link entirely
           var attrs = ' href="' + escapeAttr(href) + '"';
           if (title) attrs += ' title="' + escapeAttr(title) + '"';
           attrs += ' target="_blank" rel="noopener noreferrer"';
           return '<a' + attrs + '>' + text + '</a>';
+        },
+        image: function (href, title, text) {
+          // Fall back to the alt text rather than emitting a live element.
+          if (!isSafeImageSrc(href)) return escapeHtml(text || '');
+          var attrs = ' src="' + escapeAttr(href) + '"';
+          attrs += ' alt="' + escapeAttr(text || '') + '"';
+          if (title) attrs += ' title="' + escapeAttr(title) + '"';
+          return '<img' + attrs + '>';
         }
       }
     });
@@ -31,6 +49,17 @@
     if (/^\.\.?\//.test(s)) return true;
     // Otherwise require an explicit safe scheme.
     return /^(https?|mailto|tel):/i.test(s);
+  }
+
+  // Images additionally accept data: URLs, but only real image payloads —
+  // data:text/html would be a script vector if it ever reached an <iframe>
+  // or a navigation.
+  function isSafeImageSrc(href) {
+    if (typeof href !== 'string') return false;
+    var s = href.trim();
+    if (!s) return false;
+    if (/^data:image\/(png|jpe?g|gif|webp|bmp);base64,[a-z0-9+/=\s]+$/i.test(s)) return true;
+    return isSafeHref(s);
   }
 
   function escapeAttr(s) {
@@ -80,12 +109,26 @@
   function renderMarkdown(text) {
     if (global.marked && typeof global.marked.parse === 'function') {
       try {
-        // marked v4 escapes HTML by default — safe for untrusted content.
+        // Raw HTML is escaped by the `html` renderer installed above, so the
+        // output here contains only marked's own generated markup.
         return global.marked.parse(text || '', { breaks: true, gfm: true });
       } catch (e) { /* fall through */ }
     }
     // Fallback: escape and convert newlines.
     return escapeHtml(text || '').replace(/\n/g, '<br>');
+  }
+
+  // Insert rendered markdown into an element.
+  //
+  // Deliberately NOT jQuery's .html(): that routes through domManip, which
+  // *evaluates* any <script> it finds. innerHTML never runs scripts, so this
+  // is a second, independent layer under the renderer-level escaping — and
+  // it happens to be measurably faster, which matters because the streaming
+  // path re-renders the whole reply every 80ms on a 2013 phone.
+  function setMarkdown($el, text) {
+    var node = $el && $el[0];
+    if (!node) return;
+    node.innerHTML = renderMarkdown(text);
   }
 
   function roleLabel(role) {
@@ -107,7 +150,8 @@
       $details.append($('<div class="reasoning-content"></div>').text(msg.reasoning));
       $bub.append($details);
     }
-    var $content = $('<div class="content"></div>').html(renderMarkdown(msg.content || ''));
+    var $content = $('<div class="content"></div>');
+    setMarkdown($content, msg.content || '');
     $bub.append($content);
     if (msg.role === 'assistant') {
       $bub.append(
@@ -372,7 +416,10 @@
         .attr('data-id', c.id)
         .text(c.title || RetroI18n.t('conv.untitled'));
       if (c.id === state.currentId) $li.addClass('active');
-      $li.append($('<span class="del" data-id="' + c.id + '">&times;</span>'));
+      // Build the delete affordance with attr(), not string concatenation:
+      // conv ids come straight from imported JSON, so a hostile export file
+      // could otherwise close the attribute and inject markup here.
+      $li.append($('<span class="del">&times;</span>').attr('data-id', c.id));
       $list.append($li);
     }
   }
@@ -598,7 +645,7 @@
         clearTimeout(pendingRenderTimer);
         pendingRenderTimer = null;
       }
-      $content.html(renderMarkdown(aiMsg.content));
+      setMarkdown($content, aiMsg.content);
       lastRenderAt = Date.now();
     }
     function renderContentThrottled() {
@@ -610,7 +657,7 @@
       if (pendingRenderTimer) return;
       pendingRenderTimer = setTimeout(function () {
         pendingRenderTimer = null;
-        $content.html(renderMarkdown(aiMsg.content));
+        setMarkdown($content, aiMsg.content);
         lastRenderAt = Date.now();
       }, 80);
     }
