@@ -21,6 +21,7 @@ retro-chat/
 ├── index.html
 ├── css/style.css
 ├── js/
+│   ├── vendor/       # jQuery slim + marked，本地托管（见下）
 │   ├── storage.js   # localStorage 封装
 │   ├── stream.js    # XHR 流式读取
 │   ├── chat.js      # 消息渲染与会话管理
@@ -31,6 +32,40 @@ retro-chat/
 ├── vercel.json
 └── package.json
 ```
+
+### 第三方库为什么不用 CDN
+
+`js/vendor/` 里的两个库是提交进仓库的，不走 cdnjs：
+
+| 文件 | 版本 | SHA-512 (SRI) |
+|---|---|---|
+| `jquery.slim.min.js` | 3.6.4 | `sha512-fYjSocDD6ctuQ1QGIo9+Nn9Oc4mfau2IiE8Ki1FyMV4OcESUt81FMqmhsZe9zWZ6g6NdczrEMAos1GlLLAipWg==` |
+| `marked.min.js` | 4.3.0 | `sha512-zAs8dHhwlTbfcVGRX1x0EZAH/L99NjAFzX6muwOcOJc7dbGFNaW4O7b9QOyCMRYBNjO+E0Kx6yLDsiPQhhWm7g==` |
+
+原因有三：CDN 被投毒等于任意脚本拿到用户的 API Key；cdnjs 抖一下首屏就直接白屏（Service Worker 只能尽力缓存跨域资源，装不上就是装不上）；同源之后 Service Worker 可以把它们当成普通关键资源做「全有或全无」的预缓存。同源资源不需要 SRI —— 它们和页面本身在同一个信任边界内 —— 上表仅供你核对下载来源。
+
+要重新验证或升级：
+
+```bash
+curl -s https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.4/jquery.slim.min.js \
+  | openssl dgst -sha512 -binary | openssl base64 -A
+```
+
+输出应与上表一致。升级版本时记得同步 `sw.js` 的 `CACHE_VERSION`。
+
+### Service Worker 缓存策略
+
+`sw.js` 对同源静态资源用 **stale-while-revalidate**：先从缓存秒开，同时后台重新拉取并更新缓存，所以客户端最多落后一次加载就会自愈。导航请求走 **network-first**（离线才回落到缓存的 shell），`/api/*` 和 `/_vercel/*` 永不缓存。
+
+这一点值得说明，因为它改变了发版流程：项目没有构建步骤，资源 URL 是不带 hash 的（`/js/chat.js` 永远是 `/js/chat.js`）。**原来的 cache-first + 不写运行时缓存意味着，客户端拿到新代码的唯一途径就是 bump `CACHE_VERSION`** —— 忘了 bump，所有回访用户就被永久钉死在旧版本上，包括安全修复。改成 SWR 之后 `CACHE_VERSION` 只用于强制清空（比如从预缓存列表里删文件），不再是发布普通代码改动的必要条件。
+
+### 安全响应头
+
+`vercel.json` 为所有路径下发 CSP：`script-src 'self'` 挡住任何注入的内联脚本和外部脚本加载，配合 `object-src 'none'` / `base-uri 'self'` / `frame-ancestors 'none'`。页面里没有内联 `<script>` 也没有 `onclick=` 之类的属性，所以这条策略不需要任何豁免。
+
+`style-src` 保留了 `'unsafe-inline'`，因为 `index.html` 有一个防启动白闪的内联 `<style>`；用 hash 更严格，但改动那行样式时忘记更新 hash 会让 iOS PWA 启动白闪的 bug 复发，代价不值得 —— 何况 AI 输出里的 HTML 现在已经全部转义，CSS 注入没有入口。
+
+⚠️ `Referrer-Policy` 是 `same-origin` 而不是 `no-referrer`：后端在 `Origin` 缺失时会拿同源 `Referer` 作为「这是浏览器请求」的备用判据（见「滥用与成本防护」），`no-referrer` 会连同源请求的 `Referer` 一起掐掉，导致老 Safari 被 403。跨域请求依然不带任何 referrer。
 
 ## 本地开发
 
@@ -73,23 +108,55 @@ vercel deploy --prod
 
 ⚠️ **不要**把 API Key 写进前端代码或 commit 到 git —— 它会暴露在 bundle 里被任何人查看。
 
+### 滥用与成本防护（可选环境变量）
+
+`PRESET_API_KEY` 花的是**你的**钱，所以 `/api/chat` 默认做了三层限制。全部可选，不配置就用下面的默认值：
+
+| Name | 默认 | 作用 |
+|---|---|---|
+| `RATE_LIMIT_RPM` | `15` | 每 IP 每分钟请求数上限，`0` 关闭 |
+| `RATE_LIMIT_RPH` | `120` | 每 IP 每小时请求数上限，`0` 关闭 |
+| `MAX_MESSAGES` | `100` | 单次请求最多几条消息，`0` 关闭 |
+| `MAX_INPUT_CHARS` | `60000` | 单次请求 prompt 总字符数上限，`0` 关闭 |
+| `MAX_TOKENS_CAP` | `8192` | 强制下发的 `max_tokens` 上限；客户端可以要更少但不能要更多，`0` 表示不封顶 |
+| `ALLOW_KEYLESS_API` | `0` | 设为 `1` 才允许无 Origin/Referer 的请求使用预设凭据 |
+| `STREAM_BUDGET_MS` | `55000` | 流式响应自我了断的时限，需低于 `vercel.json` 里的 `maxDuration` |
+
+两点需要知道：
+
+- **预设凭据只发给浏览器请求。** 请求的 `Origin` 或 `Referer` 必须命中白名单（同源、localhost、或 `ALLOWED_ORIGINS`），否则直接 403。这挡住了「拿到 URL 就 curl 白嫖」这种最常见的情况。自带 `baseUrl` + `apiKey` 的请求不受此限——花的是用户自己的钱。
+- **限流器是进程内的。** Vercel 会复用热实例，所以它能挡住单个客户端的持续刷量，但**不是全局配额**：并发冷启动各有各的计数窗口。要硬性上限，需要在前面接 Vercel KV 或 Upstash。把它当减速带 + 花费天花板，不要当密码学边界。
+
+如果你用的是推理模型（thinking token 也算进 `max_tokens`），发现回答被截断，调高 `MAX_TOKENS_CAP` 即可。
+
 Vercel 会自动：
 - 把仓库根作为静态资源
 - 把 `api/chat.js` 部署为 Serverless Function
 - 把环境变量注入到 Function 运行时
 - 透传 SSE 流（已在 `vercel.json` 关闭缓存）
 
-> **注意**：Hobby 套餐 Function 单次响应上限 10 秒。如果你的模型响应较长，建议 Pro 套餐（60s）或在客户端设置 `maxTokens` 上限。
+> **Function 超时**：`vercel.json` 已把 `api/chat.js` 的 `maxDuration` 设为 **60 秒**（Hobby 套餐上限；Pro 可调到 300）。服务端另有一道 `STREAM_BUDGET_MS`（默认 55000）会在平台强杀之前主动收尾，向客户端发一条明确的「响应被截断」错误帧 —— 否则回答会被无声切断，看起来就像模型自己说完了。改 `maxDuration` 时记得同步调 `STREAM_BUDGET_MS`，留几秒余量。
 
 ## Web Analytics
 
 部署到 Vercel 后默认接入了 [Vercel Web Analytics](https://vercel.com/docs/analytics)，统计聚合的页面访问量、访问国家、设备类型 —— **不使用 cookie、不做指纹识别、不收集个人数据**，符合 GDPR / CCPA。
 
-要让它生效，需要在 Vercel Dashboard → Analytics 标签页手动 **Enable** 一次。
+纯 HTML 站点需要 `index.html` 里**两个**标签配合，缺一不可：
+
+```html
+<script src="/js/analytics.js"></script>              <!-- 队列 shim，本身不上报 -->
+<script defer src="/_vercel/insights/script.js"></script>  <!-- 真正的采集脚本 -->
+```
+
+第二个标签**不会**被 Vercel 自动注入 —— 那只发生在 Next.js 等框架集成里。此外还需要在 Vercel Dashboard → Analytics 标签页手动 **Enable** 一次（这一步会注册 `/_vercel/insights/*` 路由）。
+
+> 如果你在 Dashboard 启用了按项目生成的 unique path（用于规避广告拦截器），把上面的 `src` 换成 `/<unique-path>/script.js`。
+>
+> 验证方式：部署后打开浏览器 Network 面板，应该能看到一条发往 `/_vercel/insights/view` 的请求。看不到就说明没生效。
 
 不想要的话：
 
-1. 删掉 `index.html` 里 `<script src="/js/analytics.js"></script>` 这行
+1. 删掉 `index.html` 里上面两行 `<script>`
 2. 在 Dashboard 关掉 Analytics
 
 > RetroChat 的核心隐私承诺不变：**所有会话内容和 API Key 仍然只存在你的浏览器 localStorage**，从未上传到任何后端（除了你配置的 AI endpoint）。
@@ -99,7 +166,7 @@ Vercel 会自动：
 后端 `api/chat.js` 按以下顺序选用上游凭据：
 
 1. **请求体里的 baseUrl + apiKey + model**（用户在设置面板选"自定义"时填的）
-2. **环境变量** `PRESET_BASE_URL` + `PRESET_API_KEY` + `PRESET_MODEL`（预设服务；旧的 `MIMO_*` 变量名仍兼容）
+2. **环境变量** `PRESET_BASE_URL` + `PRESET_API_KEY` + `PRESET_MODEL`（预设服务；旧的 `MIMO_*` 变量名仍兼容）—— 仅在请求来自允许的 Origin/Referer 时下发，见上文「滥用与成本防护」
 3. 都没有 → 返回 400 错误
 
 注意：要么两个都用用户的，要么两个都用环境变量的 —— 不会混搭。如果用户只填了 baseUrl 没填 apiKey（或反之），前端会高亮报错让用户补全。
