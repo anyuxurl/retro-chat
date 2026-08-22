@@ -244,12 +244,27 @@
     </div>
   </div>
 
-  <!-- Vercel Web Analytics -->
+  <!-- Vercel Web Analytics. Two tags are required for a plain-HTML site: the
+       queue shim (analytics.js) so any va() call made before the tracker
+       lands is buffered, and the tracker itself. The tracker tag used to be
+       missing, which meant nothing was ever recorded — the shim alone tracks
+       nothing. `defer` keeps it off the critical path; a 404 here (Analytics
+       not enabled in the dashboard) is harmless.
+       NOTE: if you enabled the per-project unique path in the Vercel
+       dashboard, swap the src for `/<unique-path>/script.js`. -->
   <script src="/js/analytics.js"></script>
+  <script defer src="/_vercel/insights/script.js"></script>
 
-  <!-- Vendor libs -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.4/jquery.slim.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
+  <!-- Vendor libs. Served from our own origin rather than a CDN, deliberately:
+       a cdnjs outage would otherwise leave the app dead on first load (the SW
+       can only precache them opportunistically), and a compromised CDN would
+       execute arbitrary script with full access to the user's saved API key.
+       Same-origin also means SRI is redundant here — the bytes are covered by
+       the same trust boundary as the page itself. Both files were verified
+       byte-for-byte against cdnjs' published SHA-512 before being committed;
+       see README for the versions and how to re-verify. -->
+  <script src="/js/vendor/jquery.slim.min.js"></script>
+  <script src="/js/vendor/marked.min.js"></script>
 
   <!-- App scripts (load order matters) -->
   <script src="/js/i18n.js"></script>
