@@ -5,6 +5,7 @@
 
 const http = require('http');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const url = require('url');
 
@@ -63,6 +64,45 @@ function send404(res) {
   res.end('404 Not Found');
 }
 
+// Files this server must never hand out.
+//
+// It serves the repo root, which contains `.env.local` (your PRESET_API_KEY)
+// and `.git/config` (possibly a credentialed remote URL). Since we listen on
+// every interface so you can open the app from a phone on the same WiFi,
+// anyone on that network could previously just fetch them:
+//     curl http://<your-lan-ip>:3000/.env.local
+// Production is unaffected — Vercel only deploys committed files and both are
+// gitignored — so this is strictly a dev-server hazard, but a live one.
+//
+// Rule: reject any path with a dot-prefixed segment, plus node_modules.
+// A denylist rather than an allowlist so adding e.g. robots.txt at the root
+// doesn't silently 404.
+function isForbiddenPath(pathname) {
+  var segs = pathname.split('/');
+  for (var i = 0; i < segs.length; i++) {
+    var s = segs[i];
+    if (!s) continue;
+    if (s.charAt(0) === '.') return true;      // .env, .env.local, .git, .vercel, .claude
+    if (s === 'node_modules') return true;
+  }
+  return false;
+}
+
+// Best-effort LAN address, so the startup banner tells the truth about what
+// is reachable instead of printing an unhelpful 0.0.0.0.
+function lanAddress() {
+  var ifaces = os.networkInterfaces();
+  for (var name in ifaces) {
+    if (!Object.prototype.hasOwnProperty.call(ifaces, name)) continue;
+    var list = ifaces[name] || [];
+    for (var i = 0; i < list.length; i++) {
+      var a = list[i];
+      if (a.family === 'IPv4' && !a.internal) return a.address;
+    }
+  }
+  return null;
+}
+
 function serveFile(res, filePath) {
   fs.stat(filePath, (err, stat) => {
     if (err || !stat.isFile()) return send404(res);
@@ -98,20 +138,33 @@ const server = http.createServer(async (req, res) => {
   // Static files — default to /index.html for "/"
   if (pathname === '/') pathname = '/index.html';
 
-  // Prevent path traversal.
+  if (isForbiddenPath(pathname)) return send404(res);
+
+  // Prevent path traversal. normalize() collapses ".." and join() re-roots
+  // the result, but we still assert containment explicitly — and compare
+  // against ROOT + separator so a sibling directory sharing our prefix
+  // (…/retro-chat-secrets) can't slip through a bare startsWith.
   const safe = path.normalize(pathname).replace(/^(\.\.[\/\\])+/, '');
   const filePath = path.join(ROOT, safe);
-  if (!filePath.startsWith(ROOT)) return send404(res);
+  if (filePath !== ROOT && filePath.indexOf(ROOT + path.sep) !== 0) {
+    return send404(res);
+  }
 
   serveFile(res, filePath);
 });
 
 server.listen(PORT, () => {
+  const lan = lanAddress();
   console.log('');
   console.log('  RetroChat dev server');
   console.log('  --------------------');
   console.log('  Local:   http://localhost:' + PORT);
-  console.log('  Network: http://0.0.0.0:' + PORT);
+  if (lan) {
+    console.log('  Network: http://' + lan + ':' + PORT);
+    console.log('');
+    console.log('  ! Reachable by anyone on this network, and /api/chat will');
+    console.log('    spend the key in .env.local. Dotfiles are not served.');
+  }
   console.log('');
   console.log('  Press Ctrl+C to stop.');
   console.log('');
