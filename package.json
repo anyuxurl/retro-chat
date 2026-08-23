@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "description": "A web AI chat client that runs on retro devices (iPhone 5s / iOS 12 Safari)",
+  "license": "AGPL-3.0-or-later",
+  "author": "qeeryyu (https://134687.xyz)",
   "scripts": {
     "dev": "node dev-server.js",
     "start": "node dev-server.js",

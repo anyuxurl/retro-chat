@@ -199,4 +199,13 @@ Vercel 会自动：
 
 ## License
 
-MIT
+[GNU AGPL-3.0-or-later](LICENSE) · Copyright (c) 2026 [qeeryyu](https://134687.xyz)
+
+AGPL 的第 13 条比 GPL 多一层要求：**如果你修改了本项目并把它部署成别人能通过网络访问的服务**（自己 Vercel 一份、改个皮肤挂上线等），你必须让这些用户能拿到你那份修改后的完整源码 —— 通常做法就是在界面上留一个指向你自己仓库的 Source 链接。原样自用、不对外提供服务则不受此约束。
+
+`js/vendor/` 下的第三方库不受本项目许可证约束，各自沿用上游许可证：
+
+| 文件 | 上游许可证 |
+|---|---|
+| `jquery.slim.min.js` | MIT (jQuery Foundation) |
+| `marked.min.js` | MIT (Christopher Jeffrey) |
